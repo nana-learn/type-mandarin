@@ -44,15 +44,6 @@ export default function TypingTest() {
     return Math.max(0, duration * 1000 - (now - startedAt));
   }, [duration, now, startedAt, status]);
 
-  const elapsedMs = useMemo(() => {
-    if (startedAt === null) return 0;
-    if (status === "done") return duration * 1000;
-    return Math.min(duration * 1000, now - startedAt);
-  }, [duration, now, startedAt, status]);
-
-  const live = useMemo(() => scoreTyped(target, typed), [target, typed]);
-  const cpm = charactersPerMinute(live.correct, elapsedMs);
-
   const finish = useCallback(() => {
     if (finishedRef.current) return;
     finishedRef.current = true;
@@ -162,7 +153,6 @@ export default function TypingTest() {
     setTyped(value);
   };
 
-  const remainingLabel = formatTime(remainingMs);
   const latest = history[0];
 
   return (
@@ -230,15 +220,6 @@ export default function TypingTest() {
           </p>
         </div>
 
-        <section className="grid grid-cols-3 gap-3 mb-5">
-          <Stat label="剩余时间" value={remainingLabel} />
-          <Stat label="速度 CPM" value={String(cpm)} />
-          <Stat
-            label="准确率"
-            value={`${live.typed ? Math.round(live.accuracy) : 100}%`}
-          />
-        </section>
-
         <div
           className="w-full text-left rounded-2xl border border-[#2a261f] bg-[#161411] p-5 md:p-6 mb-4 min-h-[220px] max-h-[320px] overflow-y-auto cursor-text"
           onClick={() => inputRef.current?.focus()}
@@ -301,7 +282,6 @@ export default function TypingTest() {
                     <th className="text-left font-medium px-3 py-2">时间</th>
                     <th className="text-left font-medium px-3 py-2">等级</th>
                     <th className="text-right font-medium px-3 py-2">时长</th>
-                    <th className="text-right font-medium px-3 py-2">CPM</th>
                     <th className="text-right font-medium px-3 py-2">准确率</th>
                     <th className="text-right font-medium px-3 py-2">对 / 错</th>
                   </tr>
@@ -316,9 +296,6 @@ export default function TypingTest() {
                         {row.level ? LEVEL_LABELS[row.level as Level] ?? row.level : "—"}
                       </td>
                       <td className="px-3 py-2 text-right">{row.duration}s</td>
-                      <td className="px-3 py-2 text-right text-[#3dd68c]">
-                        {row.cpm}
-                      </td>
                       <td className="px-3 py-2 text-right">
                         {row.accuracy.toFixed(1)}%
                       </td>
@@ -360,15 +337,6 @@ function PassageView({ target, typed }: { target: string; typed: string }) {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-[#2a261f] bg-[#161411] px-4 py-3">
-      <p className="text-[11px] uppercase tracking-wide text-[#a39a8c]">{label}</p>
-      <p className="text-2xl font-semibold tabular-nums mt-0.5">{value}</p>
-    </div>
-  );
-}
-
 function ResultPanel({
   result,
   onRetry,
@@ -380,12 +348,6 @@ function ResultPanel({
     <section className="rounded-2xl border border-[#2a261f] bg-[#161411] p-6 mb-10">
       <p className="text-sm text-[#a39a8c] mb-1">时间到</p>
       <div className="flex flex-wrap items-end gap-8 mb-5">
-        <div>
-          <p className="text-5xl font-semibold text-[#3dd68c] tabular-nums">
-            {result.cpm}
-          </p>
-          <p className="text-sm text-[#a39a8c] mt-1">正确字 / 分钟（CPM）</p>
-        </div>
         <div>
           <p className="text-3xl font-semibold tabular-nums">
             {result.accuracy.toFixed(1)}%
@@ -411,9 +373,4 @@ function ResultPanel({
   );
 }
 
-function formatTime(ms: number) {
-  const total = Math.ceil(ms / 1000);
-  const minutes = Math.floor(total / 60);
-  const seconds = total % 60;
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
-}
+
