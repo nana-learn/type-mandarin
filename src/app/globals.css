@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0c0b0a;
+  --fg: #f4efe6;
+  --muted: #a39a8c;
+  --card: #161411;
+  --card-border: #2a261f;
+  --accent: #d45d32;
+  --accent-2: #e8c547;
+  --ok: #3dd68c;
+  --bad: #fb7185;
+  --current: #f5e6c8;
+}
+
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--fg);
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+body {
+  font-family:
+    "PingFang SC",
+    "Hiragino Sans GB",
+    "Noto Sans SC",
+    "Microsoft YaHei",
+    "Segoe UI",
+    sans-serif;
+}
+
+.passage {
+  font-size: 1.65rem;
+  line-height: 2.15;
+  letter-spacing: 0.04em;
+  word-break: break-all;
+}
+
+.passage span {
+  border-radius: 0.2rem;
+  padding: 0.05rem 0.04rem;
+}
+
+.passage .ok {
+  color: var(--ok);
+}
+
+.passage .bad {
+  color: var(--bad);
+  background: rgba(251, 113, 133, 0.12);
+}
+
+.passage .pending {
+  color: #7d766a;
+}
+
+.passage .cur {
+  color: var(--current);
+  background: rgba(212, 93, 50, 0.22);
+  box-shadow: 0 2px 0 0 var(--accent);
+}
+
+.passage .cur.blink {
+  animation: caret 1s steps(1) infinite;
+}
+
+@keyframes caret {
+  50% {
+    box-shadow: 0 2px 0 0 transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .passage .cur.blink {
+    animation: none;
+  }
+}
