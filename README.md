@@ -10,13 +10,13 @@ Choose **HSK 1–6**. The URL stores the level, and each visit loads a **random 
 
 | Level | Paragraphs | Link |
 | --- | ---: | --- |
-| HSK 1 | 32 | [type](https://nana-learn.github.io/type-mandarin/?level=hsk1) |
-| HSK 2 | 32 | [type](https://nana-learn.github.io/type-mandarin/?level=hsk2) |
-| HSK 3 | 30 | [type](https://nana-learn.github.io/type-mandarin/?level=hsk3) |
-| HSK 4 | 30 | [type](https://nana-learn.github.io/type-mandarin/?level=hsk4) |
-| HSK 5 | 24 | [type](https://nana-learn.github.io/type-mandarin/?level=hsk5) |
-| HSK 6 | 24 | [type](https://nana-learn.github.io/type-mandarin/?level=hsk6) |
-| **Total** | **172** | |
+| HSK 1 | 100 | [type](https://nana-learn.github.io/type-mandarin/?level=hsk1) |
+| HSK 2 | 100 | [type](https://nana-learn.github.io/type-mandarin/?level=hsk2) |
+| HSK 3 | 100 | [type](https://nana-learn.github.io/type-mandarin/?level=hsk3) |
+| HSK 4 | 100 | [type](https://nana-learn.github.io/type-mandarin/?level=hsk4) |
+| HSK 5 | 100 | [type](https://nana-learn.github.io/type-mandarin/?level=hsk5) |
+| HSK 6 | 100 | [type](https://nana-learn.github.io/type-mandarin/?level=hsk6) |
+| **Total** | **600** | |
 
 Default is HSK 1. Changing the level in the UI updates the query string, so the page is shareable.
 
