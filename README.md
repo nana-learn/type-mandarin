@@ -1,6 +1,6 @@
 # Type Mandarin
 
-A one-minute Mandarin typing test in the spirit of [10FastFingers](https://10fastfingers.com/typing-test): a paragraph of Chinese is shown, and you type characters to match it.
+A Mandarin typing practice page in the spirit of [10FastFingers](https://10fastfingers.com/typing-test): a paragraph of Chinese is shown, and you type characters to match it.
 
 **Live site:** https://nana-learn.github.io/type-mandarin/
 
@@ -19,12 +19,9 @@ Default is HSK 1. Changing the level in the UI updates the query string, so the 
 
 1. Turn on a Chinese IME (Pinyin, Wubi, Zhuyin, …).
 2. Pick a level, then type the paragraph in the input box.
-3. The timer starts on the first committed character.
-4. After the time is up, you get **CPM** (correct characters per minute) and accuracy.
+3. When the paragraph is finished, you get accuracy and correct/wrong counts.
 
 Wrong characters are marked in red; you can backspace to fix them. Paste is disabled. Esc loads another random paragraph at the same level.
-
-Chinese is scored in **characters**, not words. Only correctly typed characters count toward CPM.
 
 ## Tech stack
 

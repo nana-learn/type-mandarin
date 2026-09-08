@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   charactersPerMinute,
   charsOf,
@@ -12,25 +12,20 @@ import {
 import {
   LEVELS,
   LEVEL_LABELS,
-  nextPassage,
   randomPrompt,
   readLevelFromUrl,
   writeLevelToUrl,
   type Level,
 } from "@/lib/texts";
 
-const DURATIONS = [15, 30, 60, 120] as const;
-
 type Status = "idle" | "running" | "done";
 
 export default function TypingTest() {
-  const [duration, setDuration] = useState(60);
   const [level, setLevel] = useState<Level>("hsk1");
   const [target, setTarget] = useState("");
   const [typed, setTyped] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [startedAt, setStartedAt] = useState<number | null>(null);
-  const [now, setNow] = useState(() => Date.now());
   const [history, setHistory] = useState<TestResult[]>([]);
   const [runId, setRunId] = useState(0);
 
@@ -38,21 +33,15 @@ export default function TypingTest() {
   const composingRef = useRef(false);
   const finishedRef = useRef(false);
 
-  const remainingMs = useMemo(() => {
-    if (status === "idle" || startedAt === null) return duration * 1000;
-    if (status === "done") return 0;
-    return Math.max(0, duration * 1000 - (now - startedAt));
-  }, [duration, now, startedAt, status]);
-
   const finish = useCallback(() => {
     if (finishedRef.current) return;
     finishedRef.current = true;
     setStatus("done");
-    const elapsed = duration * 1000;
+    const elapsed = startedAt ? Date.now() - startedAt : 0;
     const scored = scoreTyped(target, inputRef.current?.value ?? typed);
     const result: TestResult = {
       at: Date.now(),
-      duration,
+      duration: Math.max(1, Math.round(elapsed / 1000)),
       level,
       cpm: charactersPerMinute(scored.correct, elapsed),
       accuracy: Math.round(scored.accuracy * 10) / 10,
@@ -66,12 +55,11 @@ export default function TypingTest() {
       return next;
     });
     inputRef.current?.blur();
-  }, [duration, level, target, typed]);
+  }, [level, startedAt, target, typed]);
 
   const restart = useCallback(
-    (nextDuration = duration, nextLevel = level) => {
+    (nextLevel = level) => {
       finishedRef.current = false;
-      setDuration(nextDuration);
       setLevel(nextLevel);
       writeLevelToUrl(nextLevel);
       setTarget(randomPrompt(nextLevel));
@@ -81,19 +69,11 @@ export default function TypingTest() {
       setRunId((id) => id + 1);
       setTimeout(() => inputRef.current?.focus(), 0);
     },
-    [duration, level],
+    [level],
   );
 
-  const changeDuration = (nextDuration: number) => {
-    if (status === "idle") {
-      setDuration(nextDuration);
-      return;
-    }
-    restart(nextDuration, level);
-  };
-
   const changeLevel = (nextLevel: Level) => {
-    restart(duration, nextLevel);
+    restart(nextLevel);
   };
 
   useEffect(() => {
@@ -106,22 +86,10 @@ export default function TypingTest() {
 
   useEffect(() => {
     if (status !== "running") return;
-    const timer = window.setInterval(() => setNow(Date.now()), 100);
-    return () => window.clearInterval(timer);
-  }, [status]);
-
-  useEffect(() => {
-    if (status === "running" && remainingMs <= 0) finish();
-  }, [finish, remainingMs, status]);
-
-  useEffect(() => {
-    if (status !== "running") return;
     const typedLen = charsOf(typed).length;
     const targetLen = charsOf(target).length;
-    if (targetLen > 0 && typedLen >= targetLen) {
-      setTarget((current) => current + nextPassage(level));
-    }
-  }, [level, status, target, typed]);
+    if (targetLen > 0 && typedLen >= targetLen) finish();
+  }, [finish, status, target, typed]);
 
   useEffect(() => {
     document.querySelector<HTMLElement>(".passage .cur")?.scrollIntoView({
@@ -148,7 +116,6 @@ export default function TypingTest() {
       finishedRef.current = false;
       setStatus("running");
       setStartedAt(Date.now());
-      setNow(Date.now());
     }
     setTyped(value);
   };
@@ -198,23 +165,6 @@ export default function TypingTest() {
               </button>
             ))}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-[#a39a8c] w-10">时长</span>
-            {DURATIONS.map((value) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => changeDuration(value)}
-                className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
-                  duration === value
-                    ? "bg-[#2a261f] border-[#d45d32] text-white"
-                    : "border-[#2a261f] text-[#a39a8c] hover:text-white"
-                }`}
-              >
-                {value} 秒
-              </button>
-            ))}
-          </div>
           <p className="text-xs text-[#7d766a]">
             每次打开 {LEVEL_LABELS[level]} 链接都会随机一篇该等级的段落。
           </p>
@@ -239,7 +189,7 @@ export default function TypingTest() {
             lang="zh-CN"
             rows={2}
             disabled={status === "done"}
-            placeholder="请开启中文输入法，在此输入……计时将在第一字后开始"
+            placeholder="请开启中文输入法，在此输入……"
             className="w-full resize-none rounded-2xl border border-[#2a261f] bg-[#12100d] px-4 py-3 text-xl leading-relaxed text-[#f4efe6] placeholder:text-[#6d655b] outline-none focus:border-[#d45d32] disabled:opacity-60"
             autoComplete="off"
             autoCorrect="off"
@@ -281,7 +231,6 @@ export default function TypingTest() {
                   <tr>
                     <th className="text-left font-medium px-3 py-2">时间</th>
                     <th className="text-left font-medium px-3 py-2">等级</th>
-                    <th className="text-right font-medium px-3 py-2">时长</th>
                     <th className="text-right font-medium px-3 py-2">准确率</th>
                     <th className="text-right font-medium px-3 py-2">对 / 错</th>
                   </tr>
@@ -295,7 +244,6 @@ export default function TypingTest() {
                       <td className="px-3 py-2">
                         {row.level ? LEVEL_LABELS[row.level as Level] ?? row.level : "—"}
                       </td>
-                      <td className="px-3 py-2 text-right">{row.duration}s</td>
                       <td className="px-3 py-2 text-right">
                         {row.accuracy.toFixed(1)}%
                       </td>
@@ -346,7 +294,7 @@ function ResultPanel({
 }) {
   return (
     <section className="rounded-2xl border border-[#2a261f] bg-[#161411] p-6 mb-10">
-      <p className="text-sm text-[#a39a8c] mb-1">时间到</p>
+      <p className="text-sm text-[#a39a8c] mb-1">完成</p>
       <div className="flex flex-wrap items-end gap-8 mb-5">
         <div>
           <p className="text-3xl font-semibold tabular-nums">
