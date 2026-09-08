@@ -6,12 +6,14 @@ A Mandarin typing practice page in the spirit of [10FastFingers](https://10fastf
 
 ## Levels
 
-Choose **HSK 1–4**. The URL stores the level, and each visit loads a **random paragraph** for that level:
+Choose **HSK 1–6**. The URL stores the level, and each visit loads a **random paragraph** for that level:
 
 - [HSK 1](https://nana-learn.github.io/type-mandarin/?level=hsk1)
 - [HSK 2](https://nana-learn.github.io/type-mandarin/?level=hsk2)
 - [HSK 3](https://nana-learn.github.io/type-mandarin/?level=hsk3)
 - [HSK 4](https://nana-learn.github.io/type-mandarin/?level=hsk4)
+- [HSK 5](https://nana-learn.github.io/type-mandarin/?level=hsk5)
+- [HSK 6](https://nana-learn.github.io/type-mandarin/?level=hsk6)
 
 Default is HSK 1. Changing the level in the UI updates the query string, so the page is shareable.
 
