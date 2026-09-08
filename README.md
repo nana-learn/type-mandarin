@@ -4,14 +4,25 @@ A one-minute Mandarin typing test in the spirit of [10FastFingers](https://10fas
 
 **Live site:** https://nana-learn.github.io/type-mandarin/
 
+## Levels
+
+Choose **HSK 1–4**. The URL stores the level, and each visit loads a **random paragraph** for that level:
+
+- [HSK 1](https://nana-learn.github.io/type-mandarin/?level=hsk1)
+- [HSK 2](https://nana-learn.github.io/type-mandarin/?level=hsk2)
+- [HSK 3](https://nana-learn.github.io/type-mandarin/?level=hsk3)
+- [HSK 4](https://nana-learn.github.io/type-mandarin/?level=hsk4)
+
+Default is HSK 1. Changing the level in the UI updates the query string, so the page is shareable.
+
 ## How it works
 
 1. Turn on a Chinese IME (Pinyin, Wubi, Zhuyin, …).
-2. Click the input box and start typing the paragraph.
+2. Pick a level, then type the paragraph in the input box.
 3. The timer starts on the first committed character.
 4. After the time is up, you get **CPM** (correct characters per minute) and accuracy.
 
-Wrong characters are marked in red; you can backspace to fix them. Paste is disabled. Esc restarts the test.
+Wrong characters are marked in red; you can backspace to fix them. Paste is disabled. Esc loads another random paragraph at the same level.
 
 Chinese is scored in **characters**, not words. Only correctly typed characters count toward CPM.
 

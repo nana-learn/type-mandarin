@@ -1,6 +1,7 @@
 export type TestResult = {
   at: number;
   duration: number;
+  level?: string;
   cpm: number;
   accuracy: number;
   correct: number;

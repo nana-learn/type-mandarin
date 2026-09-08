@@ -1,166 +1,347 @@
-export type Category = "all" | "daily" | "hsk" | "story";
+export const LEVELS = ["hsk1", "hsk2", "hsk3", "hsk4"] as const;
+
+export type Level = (typeof LEVELS)[number];
 
 export type Passage = {
   id: string;
   title: string;
-  category: Exclude<Category, "all">;
+  level: Level;
   text: string;
 };
 
+export const LEVEL_LABELS: Record<Level, string> = {
+  hsk1: "HSK 1",
+  hsk2: "HSK 2",
+  hsk3: "HSK 3",
+  hsk4: "HSK 4",
+};
+
 export const PASSAGES: Passage[] = [
+  // --- HSK 1 ---
   {
-    id: "hsk-morning",
-    title: "早上",
-    category: "hsk",
-    text: "今天早上天气很好。我七点起床，洗了脸，吃了早饭。早饭是面包和牛奶。然后我去学校上课。老师很高兴，同学也很友好。我们一起学习汉语，觉得很有意思。",
+    id: "hsk1-name",
+    title: "名字",
+    level: "hsk1",
+    text: "我叫王小明。我是学生。我今年十八岁。我家在北京。家里有爸爸、妈妈和我。我爱我的家。我的爸爸是老师，我的妈妈是医生。",
   },
   {
-    id: "hsk-family",
-    title: "家",
-    category: "hsk",
-    text: "我有一个幸福的家。家里有爸爸、妈妈和我。爸爸喜欢看书，妈妈喜欢做饭。星期天我们常去公园散步。我爱我的家，也爱我的爸爸妈妈。",
-  },
-  {
-    id: "hsk-school",
+    id: "hsk1-school",
     title: "学校",
-    category: "hsk",
-    text: "我在学校学习中文。每天要认很多汉字，还要练习写字。开始的时候我觉得很难，可是现在慢慢习惯了。只要每天多读、多写，就会越来越好。",
+    level: "hsk1",
+    text: "今天天气很好。不冷，也不太热。我去学校学习汉语。学校很大。我的老师很好。同学也很高兴。我喜欢我的学校。",
   },
   {
-    id: "hsk-food",
-    title: "吃饭",
-    category: "hsk",
-    text: "中午我去食堂吃饭。今天的菜是米饭、青菜和鸡蛋汤。味道不错，价格也便宜。吃完饭以后，我和朋友在树下聊天，休息一会儿再去教室。",
+    id: "hsk1-home",
+    title: "在家",
+    level: "hsk1",
+    text: "现在是下午三点。我在家。我想喝茶。这杯茶很好。我有苹果。我喜欢吃水果。我的猫在桌子上。狗在椅子前面。",
   },
   {
-    id: "hsk-weekend",
-    title: "周末",
-    category: "hsk",
-    text: "这个周末我想去书店买一本新书，再去咖啡馆坐一坐。如果下雨，我就待在家里看电影、听音乐。简单的计划也能让人感到开心。",
-  },
-  {
-    id: "daily-commute",
-    title: "出门",
-    category: "daily",
-    text: "早上出门的时候地铁很挤，车厢里安静得只能听见报站的声音。我站在门口，看着窗外一站一站地过去，心里把今天要做的事情又过了一遍。到站以后随着人流慢慢走出来，冷风一吹，人就清醒了。",
-  },
-  {
-    id: "daily-rain",
-    title: "下雨",
-    category: "daily",
-    text: "下午忽然下起了小雨。路边的伞一下子多了起来，路面反着浅浅的光。我走进一家小店躲雨，要了一杯热茶。雨打在玻璃上，世界好像慢了一拍，连说话都轻了些。",
-  },
-  {
-    id: "daily-market",
-    title: "菜市场",
-    category: "daily",
-    text: "周末去菜市场的时候，摊位上摆满了青菜、豆腐和刚出锅的包子。老板一边称重量，一边问要不要再送一把葱。我提着袋子往回走，太阳正好，连空气都有一点菜香。",
-  },
-  {
-    id: "daily-work",
-    title: "工作",
-    category: "daily",
-    text: "把一件事情做完，比把它想得很完美更重要。我先写下今天最要紧的三件事，然后一件一件去做。中间总会被消息打断，但只要及时回到桌上的那一行字，进度就不会丢。",
-  },
-  {
-    id: "daily-night",
-    title: "夜里",
-    category: "daily",
-    text: "夜里把灯关掉以后，窗外还有隐隐的车声。我把杯子洗干净，书签夹好，明天要穿的衣服也放在椅背上。这些很小的动作，会让早上少一点慌张。",
-  },
-  {
-    id: "daily-friend",
+    id: "hsk1-friend",
     title: "朋友",
-    category: "daily",
-    text: "和老朋友吃饭的时候，话题总是从近况开始，再慢慢说到以前的事。有人换了工作，有人刚学会做饭，也有人还是老样子。散场后走在路上，我觉得被理解是一件很安静、也很珍贵的事。",
+    level: "hsk1",
+    text: "我有一个朋友。她叫李月。她是中国人。她在北京工作。她很高兴。我认识她。我们是好朋友。她喜欢看书，我喜欢看电影。",
   },
   {
-    id: "daily-tea",
-    title: "喝茶",
-    category: "daily",
-    text: "我喜欢在下午泡一杯茶。水不要太烫，茶叶张开以后，香气才会慢慢出来。不必赶着喝完，看一会儿窗外的树，听一段不说话的时间，人也跟着松下来。",
+    id: "hsk1-shop",
+    title: "商店",
+    level: "hsk1",
+    text: "我去商店买苹果。苹果多少钱？五块钱。我买六个苹果。我也想买茶。茶很好喝。谢谢你！再见！",
   },
   {
-    id: "story-library",
+    id: "hsk1-hospital",
+    title: "医院",
+    level: "hsk1",
+    text: "请问，医院在哪儿？医院在学校前面。谢谢你。没关系。我去医院。我的朋友在医院工作。她是医生。她很好。",
+  },
+  {
+    id: "hsk1-beijing",
+    title: "去北京",
+    level: "hsk1",
+    text: "明天我去北京。我坐飞机去。今天我在家看书。这本书很好。我喜欢看书。我的爸爸也喜欢看书。他有很多书。",
+  },
+  {
+    id: "hsk1-hello",
+    title: "认识你",
+    level: "hsk1",
+    text: "你好！认识你我很高兴。你叫什么名字？我叫小白。你是学生吗？我是学生。我在中国学习汉语。我很喜欢汉语。",
+  },
+  {
+    id: "hsk1-day",
+    title: "今天",
+    level: "hsk1",
+    text: "我上午去学校，下午在家。我学习汉语，也做中国菜。我喜欢吃饭。米饭和菜都很好。我喝茶，不喝咖啡。水也很好。",
+  },
+  {
+    id: "hsk1-teacher",
+    title: "老师",
+    level: "hsk1",
+    text: "这儿有很多人。那是我的老师。她很漂亮。同学们都喜欢她。我们看书、写字、听汉语。老师说，你们都很好。我很高兴。",
+  },
+  {
+    id: "hsk1-rain",
+    title: "下雨",
+    level: "hsk1",
+    text: "我住在北京。我家不大。有桌子、椅子和书。我有电脑。我喜欢看电影。今天下雨，我在家。天气不太好。我喝茶，看书。",
+  },
+  {
+    id: "hsk1-call",
+    title: "打电话",
+    level: "hsk1",
+    text: "喂，你好！你是李老师吗？我是小明。今天下午我去学校。你在家吗？我不在家。我在商店。好，再见！",
+  },
+
+  // --- HSK 2 ---
+  {
+    id: "hsk2-busy",
+    title: "很忙",
+    level: "hsk2",
+    text: "今天早上我很忙。因为明天有考试，所以我已经学习三个小时了。妈妈给我做了鸡蛋和米饭。虽然有一点儿累，但是我还想再看一会儿书。晚上朋友会来帮助我。",
+  },
+  {
+    id: "hsk2-weekend",
+    title: "周末",
+    level: "hsk2",
+    text: "这个星期六我想去旅行。天气比昨天好，不太冷。我们一起坐火车去。姐姐说那边的山很高，路有点儿远。我准备了水果、水和衣服。我希望玩得高兴。",
+  },
+  {
+    id: "hsk2-work",
+    title: "公司",
+    level: "hsk2",
+    text: "我在一家公司工作。每天早上九点上班，下午五点下班。同事们都很好。经理让我学习电脑。虽然开始的时候有问题，但是现在我已经会了。我喜欢我的工作。",
+  },
+  {
+    id: "hsk2-birthday",
+    title: "生日",
+    level: "hsk2",
+    text: "今天是我弟弟的生日。他今年十岁。我们给他买了蛋糕和一件新衣服。晚上家里来了很多朋友。大家唱歌、跳舞、吃西瓜。弟弟笑了，他真高兴。",
+  },
+  {
+    id: "hsk2-sport",
+    title: "运动",
+    level: "hsk2",
+    text: "我最喜欢的运动是游泳。哥哥喜欢踢足球，姐姐喜欢跑步。每天下午我们一起去学校旁边的运动场。运动完以后，身体很累，但是觉得非常好。",
+  },
+  {
+    id: "hsk2-sick",
+    title: "生病",
+    level: "hsk2",
+    text: "昨天我生病了，有点儿发烧。妈妈让我休息，不要去学校。我们去医院看医生。医生给了我一些药，告诉我多喝水、早一点儿睡觉。今天我已经觉得好多了。",
+  },
+  {
+    id: "hsk2-new-home",
+    title: "新房间",
+    level: "hsk2",
+    text: "我们家有了新房间。房间比以前大。左边是我的桌子，右边是床。从窗户可以看到路和很多树。晚上我喜欢坐在房间里看报纸、看电视。",
+  },
+  {
+    id: "hsk2-why",
+    title: "为什么",
+    level: "hsk2",
+    text: "你为什么学汉语？因为我有中国朋友，所以我想和他们说话。开始的时候我觉得很难，现在已经习惯了。每天我都听一点儿汉语，也看中文电视。我希望明年去北京。",
+  },
+  {
+    id: "hsk2-airport",
+    title: "机场",
+    level: "hsk2",
+    text: "我们要去机场。从家里到机场有点儿远，所以我们坐出租车。我已经准备好票了。飞机是上午十点的。到了机场，我们还得等一个小时。虽然很忙，但是我很高兴。",
+  },
+  {
+    id: "hsk2-color",
+    title: "衣服",
+    level: "hsk2",
+    text: "我喜欢红色的衣服，姐姐喜欢白色的。今天商店的衣服很便宜。我买了一件新的，她买了两条裙子。回到家，我们洗了衣服。晚上还要准备明天的课。",
+  },
+  {
+    id: "hsk2-help",
+    title: "帮忙",
+    level: "hsk2",
+    text: "同学问我题，我告诉他这个意思。他听得不太明白，我就再说一次。因为我们是好朋友，所以我很高兴帮助他。做完以后，我们一起去吃饭。鸡蛋汤真好吃。",
+  },
+  {
+    id: "hsk2-evening",
+    title: "晚上",
+    level: "hsk2",
+    text: "晚上七点，我从公司回来。先洗手，再吃饭。看完新闻，我给妈妈打电话。她问我累不累。我说有一点儿忙，但是还好。睡觉以前，我准备明天要穿的衣服。",
+  },
+
+  // --- HSK 3 ---
+  {
+    id: "hsk3-plan",
+    title: "打算",
+    level: "hsk3",
+    text: "如果这个周末不下雨，我就打算和同事去附近的公园。我们一边走路，一边聊天。最近工作越来越忙，所以我特别需要休息。虽然只有一天时间，但是也应该让自己放松一下。",
+  },
+  {
+    id: "hsk3-exam",
+    title: "考试",
+    level: "hsk3",
+    text: "为了提高汉语成绩，我每天都复习生词和语法。老师让我们把句子读出来，还要听录音。刚开始我听不清楚，后来慢慢明白了。这次考试不但比上次容易，而且我自己也更有信心。",
+  },
+  {
+    id: "hsk3-city",
+    title: "城市",
+    level: "hsk3",
+    text: "我住的城市又方便又热闹。楼下就有超市和地铁站，去图书馆也不远。不过周末人特别多，有时候会觉得有点儿吵。如果想安静一点儿，我就去附近的公园看书，或者在家听音乐。",
+  },
+  {
+    id: "hsk3-habit",
+    title: "习惯",
+    level: "hsk3",
+    text: "来中国以后，我的习惯发生了很大变化。以前晚上十二点才睡觉，现在十一点以前就休息。我还开始锻炼身体，每天早上跑步二十分钟。其实这些事情并不难，重要的是坚持。越坚持，身体就越健康。",
+  },
+  {
+    id: "hsk3-guest",
+    title: "客人",
+    level: "hsk3",
+    text: "明天家里要来几位客人，所以我今天下午把房间打扫干净了。我还去超市买了水果、茶叶和一些简单的菜。他们是从外地来的同事。见面以后，我们不但可以吃饭，而且能一起聊聊最近的工作。",
+  },
+  {
+    id: "hsk3-choose",
+    title: "选择",
+    level: "hsk3",
+    text: "周末我想去博物馆，可是朋友想去看电影。我们讨论了一会儿，最后决定先去博物馆，然后再去吃饭。这样大家都比较满意。其实选择并不难，只要先了解别人的想法，就容易找到办法。",
+  },
+  {
+    id: "hsk3-email",
+    title: "电子邮件",
+    level: "hsk3",
+    text: "经理让我把会议的内容写成电子邮件，发给办公室的同事。我先把重要的问题写清楚，然后再检查一遍。虽然花了不少时间，但是我觉得这样做很有用。别人看完以后，就能明白我们应该怎么完成工作。",
+  },
+  {
+    id: "hsk3-festival",
+    title: "节日",
+    level: "hsk3",
+    text: "春节是中国最重要的节日。人们会回家看望父母，给孩子准备礼物，还要一起吃饭。街上不但热闹，而且到处都能听到音乐。我还不太习惯这么多人，不过心里还是很高兴。这种文化让我了解了中国人的生活。",
+  },
+  {
+    id: "hsk3-health",
+    title: "健康",
+    level: "hsk3",
+    text: "最近我总是觉得很累，所以去医院检查了一下。医生说我需要多锻炼，少吃甜的东西，还应该保证睡觉的时间。听完以后，我决定改变一些习惯。健康其实比成绩和钱更重要，自己必须认真对待。",
+  },
+  {
+    id: "hsk3-library",
     title: "图书馆",
-    category: "story",
-    text: "她在图书馆最里面的座位坐下，把笔记本打开，却迟迟没有写下一个字。窗外的梧桐正在落叶，金色的光一片一片地掉在桌上。过了很久，她终于写下第一句：我想把今天记住。",
+    level: "hsk3",
+    text: "我喜欢去图书馆，因为那儿又安静又方便。我常常把生词本带去，先复习旧的，再学习新的。有一次我发现一本关于中国历史的书，看起来不容易，但是很有意思。明白一篇以后，我就越来越想继续读下去。",
   },
   {
-    id: "story-train",
-    title: "火车",
-    category: "story",
-    text: "火车开动的时候，站台上有人在挥手。车厢里有人睡觉，有人吃橘子，有人盯着手机里的地图。原野从窗口不断后退，像一条不肯停下来的河。他想，出发其实很简单，难的是决定去哪里。",
+    id: "hsk3-neighbour",
+    title: "邻居",
+    level: "hsk3",
+    text: "我的邻居是一位很热情的老师。她不但经常帮助我练习汉语，而且还介绍我认识了几位新朋友。有时候我们在楼下面见面，站着聊一会儿天。通过这些简单的交流，我越来越习惯这里的生活了。",
   },
   {
-    id: "story-old-street",
-    title: "老街",
-    category: "story",
-    text: "那条老街并不宽，青石板被脚步磨得很亮。铺子里传出煎包的声音，门口坐着一位下棋的老人。我走得很慢，生怕走得太快，就把这些平常的风景错过了。",
+    id: "hsk3-travel",
+    title: "旅行",
+    level: "hsk3",
+    text: "去年夏天我去了一个南方的城市。那儿的天气又湿又热，但是水果特别新鲜。我们先坐了很长时间的火车，然后换公共汽车。虽然路上有点儿累，不过看到当地的文化和照片，还是觉得这次旅行很值得。",
+  },
+
+  // --- HSK 4 ---
+  {
+    id: "hsk4-method",
+    title: "方法",
+    level: "hsk4",
+    text: "提高打字速度并没有秘密，关键在于方法。即使每天只有二十分钟，只要认真练习，也会慢慢看到结果。无论课文难还是容易，都应该先保证正确，再追求速度。因此，我给自己安排了一个简单的计划：先复习旧字，再输入新的段落。",
   },
   {
-    id: "story-letter",
-    title: "信",
-    category: "story",
-    text: "他写了一封很长的信，又把它折起来，放进抽屉里。有些话适合寄出去，有些话只适合写给自己看。过了一个冬天，他再打开那封信，发现当时觉得很难的事情，如今已经轻了许多。",
+    id: "hsk4-experience",
+    title: "经验",
+    level: "hsk4",
+    text: "刚开始工作的时候，我总是担心自己缺少经验。尽管同事们都支持我，我还是不敢主动发表意见。后来经理鼓励我参加讨论，我才发现，失败并不可怕，可怕的是不总结原因。通过几次实际的交流，我不但提高了能力，而且对自己更有信心了。",
   },
   {
-    id: "story-mountain",
-    title: "山上",
-    category: "story",
-    text: "他们沿着石阶往上走，雾气还没有散尽。山里很静，只能听见自己的呼吸和远处的鸟叫。到了山顶，云忽然裂开一条缝，城市像一块淡淡的影子出现在下面。谁也没有说话，风已经把该说的都说了。",
+    id: "hsk4-environment",
+    title: "环境",
+    level: "hsk4",
+    text: "保护环境不仅仅是政府的责任，也和每个人的态度有关系。比如减少浪费、节约用水、选择公共交通，这些都是很普通却很有效的办法。如果大家都觉得自己的行为没有影响，问题就会越来越严重。只有共同努力，生活的质量才会真正得到改善。",
   },
   {
-    id: "story-snow",
-    title: "初雪",
-    category: "story",
-    text: "第一场雪来得很轻，落在屋顶上几乎没有声音。孩子们跑到院子里去看，大人站在门口笑。雪把夜晚照亮了一点，连平时看惯的路，也忽然变得新了。",
+    id: "hsk4-choice",
+    title: "决定",
+    level: "hsk4",
+    text: "人生中常常需要做选择。有的决定看起来很小，结果却会影响到后来的发展。我曾经为了方便，放弃了一个学习机会，后来觉得有些可惜。不过抱怨没有用，重要的是根据现在的条件重新安排。只要目标清楚，任何时候开始都不晚。",
   },
   {
-    id: "daily-study",
-    title: "学习",
-    category: "daily",
-    text: "学语言最怕三天打鱼两天晒网。每天哪怕只练习二十分钟，把当天的字再打一遍，比周末突击两个小时更有用。速度是练出来的，准确也是。先求对，再求快，手就会自己记住。",
+    id: "hsk4-culture",
+    title: "文化",
+    level: "hsk4",
+    text: "了解一种语言，其实就是在了解一种文化。不仅要记住词汇和语法，还应该注意人们说话的态度和习惯。有时候同样一句话，在不同的情况下意思并不完全一样。因此，多和当地人交流，比只在教室里做练习更有帮助。这样学到的知识也更容易留下来。",
   },
   {
-    id: "hsk-weather",
-    title: "天气",
-    category: "hsk",
-    text: "今天比昨天冷一点，所以我穿了外套。天气预报说下午可能下雨，出门最好带伞。如果明天放晴，我们就去河边走走，拍一些照片，再找一家小店喝汤。",
+    id: "hsk4-pressure",
+    title: "压力",
+    level: "hsk4",
+    text: "现代社会的生活节奏很快，很多人长期处于紧张的状态。即使工作已经完成，也很难真正放松。我觉得，适当的压力可以让人进步，但是超过了一定程度，就会影响健康和心情。所以我们应该学会管理时间，留下一些属于自己的空间，而不是把所有精力都放在任务上。",
+  },
+  {
+    id: "hsk4-online",
+    title: "网络",
+    level: "hsk4",
+    text: "互联网改变了我们获得信息的方式。一方面，查找资料变得非常方便；另一方面，内容质量却很难保证。如果我们缺少判断能力，就容易被错误的消息影响。因此，阅读的时候应该比较不同的观点，而不是立刻接受某一个看法。独立思考，其实是一种很重要的习惯。",
+  },
+  {
+    id: "hsk4-team",
+    title: "合作",
+    level: "hsk4",
+    text: "一个成功的项目很少只靠一个人完成。它需要合作、沟通和互相尊重。尽管大家的性格不同，有的人活泼，有的人比较内向，但只要目标一致，就能够把各自的优点发挥出来。遇到矛盾的时候，不应该只批评别人，而应该一起分析情况，找出最合适的解决办法。",
+  },
+  {
+    id: "hsk4-travel",
+    title: "出差",
+    level: "hsk4",
+    text: "这次出差让我体会到计划的重要性。出发以前，我把会议的材料、交通和住宿都安排好了。即使中途出现了变化，我也能够比较冷静地处理。这次经验告诉我，充分的准备不但能减少紧张，还能给别人留下可靠的印象。以后无论去哪里，我都会提前做好调查。",
+  },
+  {
+    id: "hsk4-reading",
+    title: "阅读",
+    level: "hsk4",
+    text: "有的人觉得阅读浪费时间，我却不这么认为。一本好书往往能提供新的角度，帮助我们理解复杂的问题。当然，不是所有文章都值得花同样的精力。我们应该根据自己的目的来选择：有的只需了解大概，有的则需要仔细研究。这样，知识才会真正变成自己的东西。",
+  },
+  {
+    id: "hsk4-honesty",
+    title: "诚实",
+    level: "hsk4",
+    text: "在任何关系里，诚实都比表面的热情更重要。即使真话有时候会让人不舒服，长期来看却能增加信任。相反，为了暂时方便而隐瞒情况，最后往往会造成更大的误会。我认为，尊重别人首先要尊重事实。只有这样，交流才有基础，合作也才可能继续下去。",
+  },
+  {
+    id: "hsk4-city-life",
+    title: "城市生活",
+    level: "hsk4",
+    text: "大城市提供了丰富的机会，同时也带来拥挤、噪音和较高的生活成本。有人喜欢这种热闹，觉得发展空间更大；也有人更愿意选择安静的小城市，认为那里更适合生活。其实没有绝对正确的答案。关键是弄清楚自己重视什么：是事业的发展，还是日常的舒适和健康。",
   },
 ];
 
-function shuffle<T>(items: T[]): T[] {
-  const next = [...items];
-  for (let i = next.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [next[i], next[j]] = [next[j], next[i]];
-  }
-  return next;
+export function isLevel(value: string | null | undefined): value is Level {
+  return value !== null && value !== undefined && (LEVELS as readonly string[]).includes(value);
 }
 
-export function passagesFor(category: Category): Passage[] {
-  if (category === "all") return PASSAGES;
-  return PASSAGES.filter((passage) => passage.category === category);
+export function passagesFor(level: Level): Passage[] {
+  return PASSAGES.filter((passage) => passage.level === level);
 }
 
-export function buildPrompt(category: Category, minChars = 800): string {
-  const pool = passagesFor(category);
-  const shuffled = shuffle(pool.length ? pool : PASSAGES);
-  const parts: string[] = [];
-  let length = 0;
-  let index = 0;
-  while (length < minChars) {
-    const text = shuffled[index % shuffled.length].text.trim();
-    parts.push(text);
-    length += text.length;
-    index += 1;
-  }
-  return parts.join("");
+export function randomPassage(level: Level): Passage {
+  const pool = passagesFor(level);
+  return pool[Math.floor(Math.random() * pool.length)] ?? PASSAGES[0];
 }
 
-export function nextPassage(category: Category): string {
-  const pool = passagesFor(category);
-  const pick = pool[Math.floor(Math.random() * pool.length)] ?? PASSAGES[0];
-  return pick.text.trim();
+export function randomPrompt(level: Level): string {
+  return randomPassage(level).text.trim();
+}
+
+export function nextPassage(level: Level): string {
+  return randomPrompt(level);
+}
+
+export function readLevelFromUrl(): Level {
+  const params = new URLSearchParams(window.location.search);
+  return isLevel(params.get("level")) ? params.get("level") as Level : "hsk1";
+}
+
+export function writeLevelToUrl(level: Level) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("level", level);
+  window.history.replaceState(null, "", url);
 }

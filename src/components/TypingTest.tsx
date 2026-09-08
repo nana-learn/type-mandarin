@@ -10,24 +10,22 @@ import {
   type TestResult,
 } from "@/lib/scoring";
 import {
-  buildPrompt,
+  LEVELS,
+  LEVEL_LABELS,
   nextPassage,
-  type Category,
+  randomPrompt,
+  readLevelFromUrl,
+  writeLevelToUrl,
+  type Level,
 } from "@/lib/texts";
 
 const DURATIONS = [15, 30, 60, 120] as const;
-const CATEGORIES: { id: Category; label: string }[] = [
-  { id: "all", label: "全部" },
-  { id: "hsk", label: "入门" },
-  { id: "daily", label: "日常" },
-  { id: "story", label: "短文" },
-];
 
 type Status = "idle" | "running" | "done";
 
 export default function TypingTest() {
   const [duration, setDuration] = useState(60);
-  const [category, setCategory] = useState<Category>("all");
+  const [level, setLevel] = useState<Level>("hsk1");
   const [target, setTarget] = useState("");
   const [typed, setTyped] = useState("");
   const [status, setStatus] = useState<Status>("idle");
@@ -64,6 +62,7 @@ export default function TypingTest() {
     const result: TestResult = {
       at: Date.now(),
       duration,
+      level,
       cpm: charactersPerMinute(scored.correct, elapsed),
       accuracy: Math.round(scored.accuracy * 10) / 10,
       correct: scored.correct,
@@ -76,25 +75,41 @@ export default function TypingTest() {
       return next;
     });
     inputRef.current?.blur();
-  }, [duration, target, typed]);
+  }, [duration, level, target, typed]);
 
   const restart = useCallback(
-    (nextDuration = duration, nextCategory = category) => {
+    (nextDuration = duration, nextLevel = level) => {
       finishedRef.current = false;
       setDuration(nextDuration);
-      setCategory(nextCategory);
-      setTarget(buildPrompt(nextCategory));
+      setLevel(nextLevel);
+      writeLevelToUrl(nextLevel);
+      setTarget(randomPrompt(nextLevel));
       setTyped("");
       setStatus("idle");
       setStartedAt(null);
       setRunId((id) => id + 1);
       setTimeout(() => inputRef.current?.focus(), 0);
     },
-    [category, duration],
+    [duration, level],
   );
 
+  const changeDuration = (nextDuration: number) => {
+    if (status === "idle") {
+      setDuration(nextDuration);
+      return;
+    }
+    restart(nextDuration, level);
+  };
+
+  const changeLevel = (nextLevel: Level) => {
+    restart(duration, nextLevel);
+  };
+
   useEffect(() => {
-    setTarget(buildPrompt("all"));
+    const fromUrl = readLevelFromUrl();
+    setLevel(fromUrl);
+    writeLevelToUrl(fromUrl);
+    setTarget(randomPrompt(fromUrl));
     setHistory(loadHistory());
   }, []);
 
@@ -109,13 +124,13 @@ export default function TypingTest() {
   }, [finish, remainingMs, status]);
 
   useEffect(() => {
-    if (status === "done") return;
+    if (status !== "running") return;
     const typedLen = charsOf(typed).length;
     const targetLen = charsOf(target).length;
-    if (targetLen > 0 && typedLen > targetLen - 40) {
-      setTarget((current) => current + nextPassage(category));
+    if (targetLen > 0 && typedLen >= targetLen) {
+      setTarget((current) => current + nextPassage(level));
     }
-  }, [category, status, target, typed]);
+  }, [level, status, target, typed]);
 
   useEffect(() => {
     document.querySelector<HTMLElement>(".passage .cur")?.scrollIntoView({
@@ -175,36 +190,44 @@ export default function TypingTest() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-8">
-        <div className="flex flex-wrap items-center gap-2 mb-6">
-          {DURATIONS.map((value) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => restart(value, category)}
-              className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
-                duration === value
-                  ? "bg-[#d45d32] border-[#d45d32] text-white"
-                  : "border-[#2a261f] text-[#a39a8c] hover:text-white"
-              }`}
-            >
-              {value} 秒
-            </button>
-          ))}
-          <span className="w-px h-5 bg-[#2a261f] mx-1" />
-          {CATEGORIES.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => restart(duration, item.id)}
-              className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
-                category === item.id
-                  ? "bg-[#2a261f] border-[#d45d32] text-white"
-                  : "border-[#2a261f] text-[#a39a8c] hover:text-white"
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
+        <div className="flex flex-col gap-3 mb-6">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-[#a39a8c] w-10">等级</span>
+            {LEVELS.map((id) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => changeLevel(id)}
+                className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                  level === id
+                    ? "bg-[#d45d32] border-[#d45d32] text-white"
+                    : "border-[#2a261f] text-[#a39a8c] hover:text-white"
+                }`}
+              >
+                {LEVEL_LABELS[id]}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-[#a39a8c] w-10">时长</span>
+            {DURATIONS.map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => changeDuration(value)}
+                className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                  duration === value
+                    ? "bg-[#2a261f] border-[#d45d32] text-white"
+                    : "border-[#2a261f] text-[#a39a8c] hover:text-white"
+                }`}
+              >
+                {value} 秒
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-[#7d766a]">
+            每次打开 {LEVEL_LABELS[level]} 链接都会随机一篇该等级的段落。
+          </p>
         </div>
 
         <section className="grid grid-cols-3 gap-3 mb-5">
@@ -254,7 +277,7 @@ export default function TypingTest() {
         </label>
 
         <div className="flex items-center justify-between gap-3 text-sm text-[#a39a8c] mb-10">
-          <p>用拼音、五笔或其他输入法打出段落中的汉字。Esc 重新开始。</p>
+          <p>用拼音、五笔或其他输入法打出段落中的汉字。Esc 换一段同级短文。</p>
           <button
             type="button"
             onClick={() => restart()}
@@ -276,6 +299,7 @@ export default function TypingTest() {
                 <thead className="bg-[#161411] text-[#a39a8c]">
                   <tr>
                     <th className="text-left font-medium px-3 py-2">时间</th>
+                    <th className="text-left font-medium px-3 py-2">等级</th>
                     <th className="text-right font-medium px-3 py-2">时长</th>
                     <th className="text-right font-medium px-3 py-2">CPM</th>
                     <th className="text-right font-medium px-3 py-2">准确率</th>
@@ -287,6 +311,9 @@ export default function TypingTest() {
                     <tr key={row.at} className="border-t border-[#2a261f]">
                       <td className="px-3 py-2 text-[#cfc6b8]">
                         {new Date(row.at).toLocaleString()}
+                      </td>
+                      <td className="px-3 py-2">
+                        {row.level ? LEVEL_LABELS[row.level as Level] ?? row.level : "—"}
                       </td>
                       <td className="px-3 py-2 text-right">{row.duration}s</td>
                       <td className="px-3 py-2 text-right text-[#3dd68c]">
