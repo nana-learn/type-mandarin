@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { charsOf } from "@/lib/scoring";
 import {
   LEVELS,
@@ -11,12 +11,14 @@ import {
   type Level,
 } from "@/lib/texts";
 import { playSound, playFinishSound, initAudio } from "@/lib/sounds";
+import { textToPinyin } from "@/lib/pinyin";
 
 export default function TypingTest() {
   const [level, setLevel] = useState<Level>("hsk1");
   const [target, setTarget] = useState("");
   const [typed, setTyped] = useState("");
   const [runId, setRunId] = useState(0);
+  const [showPinyin, setShowPinyin] = useState(false);
 
   const [soundEnabled, setSoundEnabled] = useState(true);
 
@@ -29,6 +31,13 @@ export default function TypingTest() {
       window.localStorage.setItem("soundEnabled", String(soundEnabled));
     }
   }, [soundEnabled]);
+
+  // Save pinyin preference to local storage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("showPinyin", String(showPinyin));
+    }
+  }, [showPinyin]);
 
   const restart = useCallback((nextLevel = level) => {
     setLevel(nextLevel);
@@ -53,6 +62,11 @@ export default function TypingTest() {
       const saved = window.localStorage.getItem("soundEnabled");
       if (saved !== null) {
         setSoundEnabled(saved === "true");
+      }
+      // Check local storage for pinyin preference
+      const savedPinyin = window.localStorage.getItem("showPinyin");
+      if (savedPinyin !== null) {
+        setShowPinyin(savedPinyin === "true");
       }
     }
   }, []);
@@ -106,6 +120,17 @@ export default function TypingTest() {
   };
 
   const toggleSound = () => setSoundEnabled(prev => !prev);
+  const togglePinyin = () => setShowPinyin(prev => !prev);
+
+  // Memoize pinyin computation to avoid recalculating on every render
+  const pinyinText = useMemo(() => {
+    if (!showPinyin || !target) return null;
+    try {
+      return textToPinyin(target);
+    } catch {
+      return null;
+    }
+  }, [showPinyin, target]);
 
   return (
     <div className="min-h-screen">
@@ -149,6 +174,35 @@ export default function TypingTest() {
                 )}
               </svg>
               <span>{soundEnabled ? "声音" : "静音"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={togglePinyin}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
+                showPinyin
+                  ? "bg-[#2d6d4a]/20 text-[#2d6d4a] border border-[#2d6d4a]/30"
+                  : "text-[#6d655b] hover:text-[#a39a8c]"
+              }`}
+              title={showPinyin ? "Hide pinyin" : "Show pinyin"}
+            >
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                {showPinyin ? (
+                  <>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                  </>
+                ) : (
+                  <>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </>
+                )}
+              </svg>
+              <span>{showPinyin ? "拼音" : "汉字"}</span>
             </button>
             <a
               href="https://github.com/nana-learn/type-mandarin"
@@ -194,7 +248,7 @@ export default function TypingTest() {
           }}
         >
           {target ? (
-            <PassageView target={target} typed={typed} />
+            <PassageView target={target} typed={typed} showPinyin={showPinyin} pinyinText={pinyinText} />
           ) : (
             <p className="text-[#7d766a] text-lg">正在准备段落…</p>
           )}
@@ -228,7 +282,9 @@ export default function TypingTest() {
         <div className="flex items-center justify-between gap-3 text-sm text-[#a39a8c]">
           <p>用拼音、五笔或其他输入法打出段落中的汉字。Esc 换一段同级短文。</p>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-[#7d766a]">{soundEnabled ? "声音已开启" : "已静音"}</span>
+            <span className="text-xs text-[#7d766a]">
+              {soundEnabled ? "声音已开启" : "已静音"} • {showPinyin ? "显示拼音" : "隐藏拼音"}
+            </span>
             <button
               type="button"
               onClick={() => {
@@ -246,25 +302,42 @@ export default function TypingTest() {
   );
 }
 
-function PassageView({ target, typed }: { target: string; typed: string }) {
+function PassageView({ target, typed, showPinyin, pinyinText }: { target: string; typed: string; showPinyin: boolean; pinyinText: string | null }) {
   const targetChars = charsOf(target);
   const typedChars = charsOf(typed);
 
+  // Split pinyin by space if available
+  const pinyinArray = pinyinText ? pinyinText.split(' ') : [];
+
   return (
-    <p className="passage">
-      {targetChars.map((character, index) => {
-        let className = "pending";
-        if (index < typedChars.length) {
-          className = typedChars[index] === character ? "ok" : "bad";
-        } else if (index === typedChars.length) {
-          className = "cur blink";
-        }
-        return (
-          <span key={`${index}-${character}`} className={className}>
-            {character}
-          </span>
-        );
-      })}
-    </p>
+    <div className="passage">
+      {/* Pinyin row - only show if enabled and pinyin available */}
+      {showPinyin && pinyinArray.length > 0 && (
+        <div className="mb-1 flex flex-wrap text-sm text-[#d45d32] leading-relaxed">
+          {pinyinArray.map((pinyin, index) => (
+            <span key={`pinyin-${index}`} className="mr-2">
+              {pinyin}
+            </span>
+          ))}
+        </div>
+      )}
+      
+      {/* Character row */}
+      <p>
+        {targetChars.map((character, index) => {
+          let className = "pending";
+          if (index < typedChars.length) {
+            className = typedChars[index] === character ? "ok" : "bad";
+          } else if (index === typedChars.length) {
+            className = "cur blink";
+          }
+          return (
+            <span key={`${index}-${character}`} className={className}>
+              {character}
+            </span>
+          );
+        })}
+      </p>
+    </div>
   );
 }
