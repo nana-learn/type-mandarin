@@ -10,6 +10,7 @@ import {
   writeLevelToUrl,
   type Level,
 } from "@/lib/texts";
+import { playSound, playFinishSound, initAudio } from "@/lib/sounds";
 
 export default function TypingTest() {
   const [level, setLevel] = useState<Level>("hsk1");
@@ -17,8 +18,17 @@ export default function TypingTest() {
   const [typed, setTyped] = useState("");
   const [runId, setRunId] = useState(0);
 
+  const [soundEnabled, setSoundEnabled] = useState(true);
+
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const composingRef = useRef(false);
+
+  // Save sound preference to local storage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("soundEnabled", String(soundEnabled));
+    }
+  }, [soundEnabled]);
 
   const restart = useCallback((nextLevel = level) => {
     setLevel(nextLevel);
@@ -34,12 +44,42 @@ export default function TypingTest() {
     setLevel(fromUrl);
     writeLevelToUrl(fromUrl);
     setTarget(randomPrompt(fromUrl));
+    
+    // Initialize audio context on first load
+    initAudio();
+    
+    // Check local storage for sound preference
+    if (typeof window !== "undefined") {
+      const saved = window.localStorage.getItem("soundEnabled");
+      if (saved !== null) {
+        setSoundEnabled(saved === "true");
+      }
+    }
   }, []);
 
   useEffect(() => {
-    if (!target || !typed) return;
-    if (charsOf(typed).length >= charsOf(target).length) restart();
-  }, [restart, target, typed]);
+    if (!target || !typed || !soundEnabled) return;
+    const targetChars = charsOf(target);
+    const typedChars = charsOf(typed);
+    
+    // Play sound for last typed character
+    if (typedChars.length > 0) {
+      const lastTypedIndex = typedChars.length - 1;
+      if (lastTypedIndex < targetChars.length) {
+        if (typedChars[lastTypedIndex] === targetChars[lastTypedIndex]) {
+          playSound("correct");
+        } else {
+          playSound("wrong");
+        }
+      }
+    }
+    
+    // Finish passage and play success sound
+    if (typedChars.length >= targetChars.length) {
+      playFinishSound();
+      setTimeout(() => restart(), 300);
+    }
+  }, [typed, restart]);
 
   useEffect(() => {
     document.querySelector<HTMLElement>(".passage .cur")?.scrollIntoView({
@@ -52,6 +92,7 @@ export default function TypingTest() {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
+        initAudio();
         restart();
       }
     };
@@ -63,6 +104,8 @@ export default function TypingTest() {
     if (composingRef.current) return;
     setTyped(inputRef.current?.value ?? "");
   };
+
+  const toggleSound = () => setSoundEnabled(prev => !prev);
 
   return (
     <div className="min-h-screen">
@@ -77,14 +120,45 @@ export default function TypingTest() {
               <p className="text-[11px] text-[#a39a8c] leading-none">汉字打字练习</p>
             </div>
           </div>
-          <a
-            href="https://github.com/nana-learn/type-mandarin"
-            className="text-xs text-[#a39a8c] hover:text-white transition-colors"
-            target="_blank"
-            rel="noreferrer"
-          >
-            GitHub
-          </a>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={toggleSound}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
+                soundEnabled
+                  ? "bg-[#d45d32]/20 text-[#d45d32] border border-[#d45d32]/30"
+                  : "text-[#6d655b] hover:text-[#a39a8c]"
+              }`}
+              title={soundEnabled ? "Disable sound effects" : "Enable sound effects"}
+            >
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                {soundEnabled ? (
+                  <>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                  </>
+                ) : (
+                  <>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                  </>
+                )}
+              </svg>
+              <span>{soundEnabled ? "声音" : "静音"}</span>
+            </button>
+            <a
+              href="https://github.com/nana-learn/type-mandarin"
+              className="text-xs text-[#a39a8c] hover:text-white transition-colors"
+              target="_blank"
+              rel="noreferrer"
+            >
+              GitHub
+            </a>
+          </div>
         </div>
       </header>
 
@@ -114,7 +188,10 @@ export default function TypingTest() {
 
         <div
           className="w-full text-left rounded-2xl border border-[#2a261f] bg-[#161411] p-5 md:p-6 mb-4 min-h-[220px] max-h-[320px] overflow-y-auto cursor-text"
-          onClick={() => inputRef.current?.focus()}
+          onClick={() => {
+            initAudio();
+            inputRef.current?.focus();
+          }}
         >
           {target ? (
             <PassageView target={target} typed={typed} />
@@ -150,13 +227,19 @@ export default function TypingTest() {
 
         <div className="flex items-center justify-between gap-3 text-sm text-[#a39a8c]">
           <p>用拼音、五笔或其他输入法打出段落中的汉字。Esc 换一段同级短文。</p>
-          <button
-            type="button"
-            onClick={() => restart()}
-            className="shrink-0 px-3 py-1.5 rounded-lg border border-[#2a261f] hover:text-white hover:border-[#d45d32] transition-colors"
-          >
-            换一段
-          </button>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[#7d766a]">{soundEnabled ? "声音已开启" : "已静音"}</span>
+            <button
+              type="button"
+              onClick={() => {
+                initAudio();
+                restart();
+              }}
+              className="shrink-0 px-3 py-1.5 rounded-lg border border-[#2a261f] hover:text-white hover:border-[#d45d32] transition-colors"
+            >
+              换一段
+            </button>
+          </div>
         </div>
       </main>
     </div>
