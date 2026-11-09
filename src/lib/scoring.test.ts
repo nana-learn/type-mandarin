@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  charDrill,
   missedSentenceList,
   missedSentences,
   nextStreak,
   noteDaily,
   noteRun,
+  rememberChars,
   rememberSentences,
   scoreTyped,
   seedStats,
@@ -28,6 +30,12 @@ test("stopAtFirstMistake keeps the error and drops what follows", () => {
 test("missedSentences keeps only the sentence with a mismatch", () => {
   assert.equal(missedSentences("我爱家。今天很热。", "我爱家。今天很冷。"), "今天很热。");
   assert.equal(missedSentences("只有一句。", "只有一句。"), null);
+});
+
+test("rememberChars skips punctuation and charDrill repeats the misses", () => {
+  const stored = rememberChars([], [{ index: 0, expected: "吃", actual: "喝" }, { index: 1, expected: "。", actual: "，" }], 1);
+  assert.deepEqual(stored.map((item) => item.char), ["吃"]);
+  assert.equal(charDrill(["吃", "喝"]), "请再打这些字：吃、喝。吃喝。");
 });
 
 test("noteDaily resets on a new day and keeps counting today", () => {

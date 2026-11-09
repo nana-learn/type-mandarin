@@ -6,7 +6,9 @@ import { showRuby } from "@/lib/ruby";
 import {
   charsOf,
   charactersPerMinute,
+  charDrill,
   formatDuration,
+  loadChars,
   loadHistory,
   loadReview,
   loadStats,
@@ -16,10 +18,12 @@ import {
   missedSentences,
   mistakesOf,
   noteRun,
+  rememberChars,
   rememberSentences,
   nextStreak,
   noteDaily,
   saveDaily,
+  saveChars,
   saveHistory,
   saveReview,
   saveStats,
@@ -30,6 +34,7 @@ import {
   stopAtFirstMistake,
   dayKey,
   DAILY_GOAL,
+  type CharStat,
   type Daily,
   type LevelStats,
   type ReviewItem,
@@ -161,6 +166,7 @@ export default function TypingTest() {
   const [finished, setFinished] = useState<TestResult | null>(null);
   const [history, setHistory] = useState<TestResult[]>([]);
   const [review, setReview] = useState<ReviewItem[]>([]);
+  const [chars, setChars] = useState<CharStat[]>([]);
   const [elapsed, setElapsed] = useState(0);
   const [copied, setCopied] = useState(false);
   const [streak, setStreak] = useState<Streak | null>(null);
@@ -179,6 +185,7 @@ export default function TypingTest() {
   const levelRef = useRef<Level>(level);
   const historyRef = useRef<TestResult[]>([]);
   const reviewRef = useRef<ReviewItem[]>([]);
+  const charsRef = useRef<CharStat[]>([]);
   const soundRef = useRef<SoundMode>("all");
   const strictRef = useRef(false);
   const statsRef = useRef<Record<string, LevelStats>>({});
@@ -206,6 +213,7 @@ export default function TypingTest() {
     const history = loadHistory();
     setHistory(history);
     setReview(loadReview());
+    setChars(loadChars());
     setLevelStats(seedStats(loadStats(), history));
     setStreak(loadStreak());
     setDaily(loadDaily());
@@ -223,6 +231,8 @@ export default function TypingTest() {
   const catalog = pool ?? [];
   const selectedId = passage && catalog.some((item) => item.id === urlIdOf(passage.id)) ? urlIdOf(passage.id) : "";
   const reviewHere = review.filter((item) => item.level === level).slice(0, 5);
+  const weakChars = chars.slice(0, 8);
+  const weakText = charDrill(weakChars.map((item) => item.char));
   const liveStreak = streakIsLive(streak) ? streak : null;
   const todayCount = daily && daily.day === dayKey() ? daily.count : 0;
   const upcoming = targetChars.slice(charsOf(typed).length, charsOf(typed).length + 8).join("");
@@ -302,7 +312,14 @@ export default function TypingTest() {
     historyRef.current = nextHistory;
     saveHistory(nextHistory);
     setHistory(nextHistory);
-    if (!current.id.endsWith("__drill") && !current.id.endsWith("-review")) {
+    const missedChars = mistakesOf(current.text, value);
+    if (missedChars.length > 0) {
+      const nextChars = rememberChars(charsRef.current, missedChars, result.at);
+      charsRef.current = nextChars;
+      saveChars(nextChars);
+      setChars(nextChars);
+    }
+    if (!current.id.endsWith("__drill") && !current.id.endsWith("-review") && !current.id.endsWith("-chars")) {
       const nextStats = noteRun(statsRef.current, levelRef.current, result.cpm, result.accuracy);
       statsRef.current = nextStats;
       saveStats(nextStats);
@@ -356,6 +373,7 @@ export default function TypingTest() {
     levelRef.current = level;
     historyRef.current = history;
     reviewRef.current = review;
+    charsRef.current = chars;
     soundRef.current = soundMode;
     strictRef.current = strict;
     statsRef.current = levelStats;
@@ -838,6 +856,8 @@ export default function TypingTest() {
                         type="button"
                         onClick={() => {
                           if (!isLevel(item.level) || !item.passageId) return;
+                          finishedRef.current = false;
+                          setFinished(null);
                           if (saved) {
                             begin(item.level, saved);
                             return;
@@ -860,6 +880,45 @@ export default function TypingTest() {
                 );
               })}
             </ul>
+          </div>
+        )}
+
+        {weakText && (
+          <div className="mt-6">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs text-[#7d766a]">常错字</p>
+              <button
+                type="button"
+                onClick={() => {
+                  charsRef.current = [];
+                  saveChars([]);
+                  setChars([]);
+                }}
+                className="text-xs text-[#7d766a] hover:text-white"
+              >
+                清除
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {weakChars.map((item) => (
+                <span key={item.char} className="rounded-full border border-[#2a261f] px-2.5 py-1 text-sm">
+                  {item.char}
+                  <span className="ml-1 text-xs text-[#fb7185]">{item.wrong}</span>
+                </span>
+              ))}
+              <button
+                type="button"
+                onClick={() => begin(level, {
+                  id: `${level}-chars`,
+                  title: "常错字",
+                  level,
+                  text: weakText,
+                })}
+                className="rounded-full border border-[#d45d32] px-3 py-1 text-sm text-[#d45d32] hover:bg-[#d45d32] hover:text-white"
+              >
+                再打一遍
+              </button>
+            </div>
           </div>
         )}
 

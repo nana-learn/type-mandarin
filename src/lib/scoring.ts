@@ -189,6 +189,53 @@ export function saveReview(items: ReviewItem[]) {
   window.localStorage.setItem(REVIEW_KEY, JSON.stringify(items.slice(0, 20)));
 }
 
+export type CharStat = {
+  char: string;
+  wrong: number;
+  at: number;
+};
+
+const HAN = /[\u4e00-\u9fff]/;
+
+export function rememberChars(items: CharStat[], mistakes: Mistake[], at: number): CharStat[] {
+  const next = items.map((item) => ({ ...item }));
+  for (const miss of mistakes) {
+    if (!HAN.test(miss.expected)) continue;
+    const found = next.find((item) => item.char === miss.expected);
+    if (found) {
+      found.wrong += 1;
+      found.at = at;
+    } else {
+      next.push({ char: miss.expected, wrong: 1, at });
+    }
+  }
+  return next.sort((a, b) => b.wrong - a.wrong || b.at - a.at).slice(0, 24);
+}
+
+export function charDrill(chars: string[]) {
+  const unique = [...new Set(chars.filter((char) => HAN.test(char)))].slice(0, 8);
+  if (unique.length === 0) return null;
+  return `请再打这些字：${unique.join("、")}。${unique.join("")}。`;
+}
+
+export const CHARS_KEY = "type-mandarin-chars";
+
+export function loadChars(): CharStat[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(CHARS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as CharStat[];
+    return Array.isArray(parsed) ? parsed.filter((item) => item && typeof item.char === "string").slice(0, 24) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveChars(items: CharStat[]) {
+  window.localStorage.setItem(CHARS_KEY, JSON.stringify(items.slice(0, 24)));
+}
+
 export type Streak = {
   count: number;
   lastDay: string;
