@@ -4,6 +4,7 @@ import {
   missedSentenceList,
   missedSentences,
   nextStreak,
+  noteDaily,
   noteRun,
   rememberSentences,
   scoreTyped,
@@ -27,6 +28,14 @@ test("stopAtFirstMistake keeps the error and drops what follows", () => {
 test("missedSentences keeps only the sentence with a mismatch", () => {
   assert.equal(missedSentences("我爱家。今天很热。", "我爱家。今天很冷。"), "今天很热。");
   assert.equal(missedSentences("只有一句。", "只有一句。"), null);
+});
+
+test("noteDaily resets on a new day and keeps counting today", () => {
+  const at = new Date(2026, 2, 20, 12).getTime();
+  const first = noteDaily(null, at);
+  const second = noteDaily(first, at);
+  assert.equal(second.count, 2);
+  assert.equal(noteDaily(second, at + 24 * 60 * 60 * 1000).count, 1);
 });
 
 test("nextStreak continues yesterday and resets after a gap", () => {

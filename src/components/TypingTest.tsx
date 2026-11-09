@@ -10,6 +10,7 @@ import {
   loadHistory,
   loadReview,
   loadStats,
+  loadDaily,
   loadStreak,
   missedSentenceList,
   missedSentences,
@@ -17,6 +18,8 @@ import {
   noteRun,
   rememberSentences,
   nextStreak,
+  noteDaily,
+  saveDaily,
   saveHistory,
   saveReview,
   saveStats,
@@ -25,6 +28,9 @@ import {
   scoreTyped,
   seedStats,
   stopAtFirstMistake,
+  dayKey,
+  DAILY_GOAL,
+  type Daily,
   type LevelStats,
   type ReviewItem,
   type Streak,
@@ -158,6 +164,7 @@ export default function TypingTest() {
   const [elapsed, setElapsed] = useState(0);
   const [copied, setCopied] = useState(false);
   const [streak, setStreak] = useState<Streak | null>(null);
+  const [daily, setDaily] = useState<Daily | null>(null);
   const [pendingPick, setPendingPick] = useState<string | "random" | null>(null);
   const [pendingAvoid, setPendingAvoid] = useState<string[]>([]);
   const keyboardInset = useKeyboardInset();
@@ -176,6 +183,7 @@ export default function TypingTest() {
   const strictRef = useRef(false);
   const statsRef = useRef<Record<string, LevelStats>>({});
   const streakRef = useRef<Streak | null>(null);
+  const dailyRef = useRef<Daily | null>(null);
   const recentRef = useRef<string[]>([]);
   const passageBoxRef = useRef<HTMLDivElement>(null);
 
@@ -200,6 +208,7 @@ export default function TypingTest() {
     setReview(loadReview());
     setLevelStats(seedStats(loadStats(), history));
     setStreak(loadStreak());
+    setDaily(loadDaily());
   }
 
   const target = passage?.text ?? "";
@@ -215,6 +224,7 @@ export default function TypingTest() {
   const selectedId = passage && catalog.some((item) => item.id === urlIdOf(passage.id)) ? urlIdOf(passage.id) : "";
   const reviewHere = review.filter((item) => item.level === level).slice(0, 5);
   const liveStreak = streakIsLive(streak) ? streak : null;
+  const todayCount = daily && daily.day === dayKey() ? daily.count : 0;
   const upcoming = targetChars.slice(charsOf(typed).length, charsOf(typed).length + 8).join("");
   const stuck = strict && charsOf(typed).length > 0 && charsOf(typed).at(-1) !== targetChars[charsOf(typed).length - 1];
   const readings = useSyncExternalStore(
@@ -301,6 +311,10 @@ export default function TypingTest() {
       streakRef.current = nextStreakValue;
       saveStreak(nextStreakValue);
       setStreak(nextStreakValue);
+      const nextDaily = noteDaily(dailyRef.current, result.at);
+      dailyRef.current = nextDaily;
+      saveDaily(nextDaily);
+      setDaily(nextDaily);
     }
     setFinished(result);
     setElapsed(duration);
@@ -346,6 +360,7 @@ export default function TypingTest() {
     strictRef.current = strict;
     statsRef.current = levelStats;
     streakRef.current = streak;
+    dailyRef.current = daily;
     if (passage) {
       recentRef.current = [passage.id, ...recentRef.current.filter((id) => id !== passage.id)].slice(0, 12);
     }
@@ -584,6 +599,7 @@ export default function TypingTest() {
               : `每次打开 ${LEVEL_LABELS[level]} 都会随机一篇该等级的段落。`}
             {stats && stats.runs > 0 ? ` · 最好 ${stats.bestCpm} 字/分 · ${stats.runs} 次` : ""}
             {liveStreak ? ` · 连续 ${liveStreak.count} 天` : ""}
+            {` · 今天 ${Math.min(todayCount, DAILY_GOAL)}/${DAILY_GOAL}`}
             {strict ? " · 打错后必须退格" : ""}
           </p>
         </div>

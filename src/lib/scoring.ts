@@ -239,6 +239,37 @@ export function saveStreak(streak: Streak) {
   window.localStorage.setItem(STREAK_KEY, JSON.stringify(streak));
 }
 
+export const DAILY_GOAL = 3;
+export const DAILY_KEY = "type-mandarin-daily";
+
+export type Daily = {
+  day: string;
+  count: number;
+};
+
+export function noteDaily(daily: Daily | null, at = Date.now()): Daily {
+  const today = dayKey(at);
+  if (!daily || daily.day !== today) return { day: today, count: 1 };
+  return { day: today, count: daily.count + 1 };
+}
+
+export function loadDaily(): Daily | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(DAILY_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Daily;
+    if (!parsed || typeof parsed.count !== "number" || typeof parsed.day !== "string") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function saveDaily(daily: Daily) {
+  window.localStorage.setItem(DAILY_KEY, JSON.stringify(daily));
+}
+
 export function charactersPerMinute(correct: number, elapsedMs: number) {
   if (elapsedMs <= 0) return 0;
   return Math.round((correct * 60000) / elapsedMs);
