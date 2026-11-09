@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { applyBackup, collectBackup, readBackup } from "@/lib/backup";
 import { preferUnfinished } from "@/lib/pool";
 import { readingsFor, requestReadings, subscribeReadings } from "@/lib/pinyin-loader";
 import { showRuby } from "@/lib/ruby";
@@ -175,6 +176,7 @@ export default function TypingTest() {
   const [done, setDone] = useState<Record<string, string[]>>({});
   const [elapsed, setElapsed] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [backupNote, setBackupNote] = useState("");
   const [streak, setStreak] = useState<Streak | null>(null);
   const [daily, setDaily] = useState<Daily | null>(null);
   const [pendingPick, setPendingPick] = useState<string | "random" | null>(null);
@@ -487,7 +489,9 @@ export default function TypingTest() {
   }, [begin]);
 
   useEffect(() => {
-    if (finished) nextRef.current?.focus();
+    if (!finished) return;
+    if (window.matchMedia("(max-width: 767px)").matches) return;
+    nextRef.current?.focus();
   }, [finished]);
 
   const syncTyped = () => {
@@ -512,6 +516,49 @@ export default function TypingTest() {
       setLinkCopied(true);
     } catch {
       setLinkCopied(false);
+    }
+  };
+
+  const reloadSaved = () => {
+    const nextHistory = loadHistory();
+    setHistory(nextHistory);
+    setReview(loadReview());
+    setChars(loadChars());
+    setDone(loadDone());
+    setLevelStats(seedStats(loadStats(), nextHistory));
+    setStreak(loadStreak());
+    setDaily(loadDaily());
+    setSoundMode(readSoundMode());
+    setShowPinyin(readFlag(PINYIN_KEY, false));
+    setStrict(readFlag(STRICT_KEY, false));
+  };
+
+  const downloadBackup = () => {
+    const backup = collectBackup((key) => localStorage.getItem(key));
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "type-mandarin-backup.json";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importBackup = async (file: File) => {
+    try {
+      const backup = readBackup(JSON.parse(await file.text()));
+      if (!backup) {
+        setBackupNote("无法读取这份备份");
+        return;
+      }
+      applyBackup(backup, (key, value) => {
+        if (value === null) localStorage.removeItem(key);
+        else localStorage.setItem(key, value);
+      });
+      reloadSaved();
+      setBackupNote("已导入");
+    } catch {
+      setBackupNote("无法读取这份备份");
     }
   };
 
@@ -588,7 +635,7 @@ export default function TypingTest() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-8 pb-44 md:pb-8">
+      <main className="max-w-4xl mx-auto px-4 py-8 pb-52 md:pb-8">
         <div className="flex flex-col gap-3 mb-6">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-[#a39a8c] w-10">等级</span>
@@ -632,6 +679,7 @@ export default function TypingTest() {
               <button
                 type="button"
                 onClick={() => {
+                  if (!window.confirm("清除本级的完成记录？")) return;
                   const next = clearDone(done, level);
                   doneRef.current = next;
                   saveDone(next);
@@ -993,6 +1041,26 @@ export default function TypingTest() {
             </ul>
           </div>
         )}
+
+        <div className="mt-8 flex flex-wrap items-center gap-3 text-xs text-[#7d766a]">
+          <button type="button" onClick={downloadBackup} className="hover:text-white">
+            导出进度
+          </button>
+          <label className="hover:text-white cursor-pointer">
+            导入进度
+            <input
+              type="file"
+              accept="application/json"
+              className="sr-only"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (file) importBackup(file);
+              }}
+            />
+          </label>
+          {backupNote && <span>{backupNote}</span>}
+        </div>
       </main>
     </div>
   );
