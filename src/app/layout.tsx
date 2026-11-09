@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Type Mandarin — 汉字打字测试",
   description:
-    "A one-minute Mandarin typing test. Type the paragraph with your Chinese IME and see CPM and accuracy.",
+    "Practice typing Mandarin paragraphs at HSK 1–6. See accuracy, characters per minute, and optional pinyin.",
 };
 
 export default function RootLayout({

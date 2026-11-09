@@ -25,9 +25,12 @@ export function passagesFor(level: Level): Passage[] {
   return PASSAGES.filter((passage) => passage.level === level);
 }
 
-export function randomPassage(level: Level): Passage {
+export function randomPassage(level: Level, avoidId?: string): Passage {
   const pool = passagesFor(level);
-  return pool[Math.floor(Math.random() * pool.length)] ?? PASSAGES[0];
+  const choices = avoidId ? pool.filter((item) => item.id !== avoidId) : pool;
+  const source = choices.length > 0 ? choices : pool;
+  const picked = source[Math.floor(Math.random() * source.length)] ?? PASSAGES[0];
+  return { ...picked, text: picked.text.trim() };
 }
 
 export function randomPrompt(level: Level): string {

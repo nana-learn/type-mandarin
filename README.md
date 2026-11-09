@@ -24,9 +24,9 @@ Default is HSK 1. Changing the level in the UI updates the query string, so the 
 
 1. Turn on a Chinese IME (Pinyin, Wubi, Zhuyin, …).
 2. Pick a level, then type the paragraph in the input box.
-3. Finishing a paragraph loads another random one at the same level.
+3. Finishing a paragraph shows characters per minute and accuracy. Load another, or repeat the same one.
 
-Wrong characters are marked in red; you can backspace to fix them. Paste is disabled. Esc loads another random paragraph at the same level.
+Wrong characters are marked in red; you can backspace to fix them. Paste is disabled. Esc loads another random paragraph at the same level. The header can show tone-marked pinyin above each character, or turn keystroke sounds off. Both choices are remembered.
 
 ## Tech stack
 

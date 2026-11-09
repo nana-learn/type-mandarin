@@ -1,16 +1,21 @@
-import { pinyin } from 'pinyin-pro';
+import { pinyin } from "pinyin-pro";
 
-/**
- * Convert Chinese text to Pinyin
- * Uses pinyin-pro library for accurate conversion
- */
-export function textToPinyin(text: string): string {
-  return pinyin(text, { toneType: 'none', type: 'array' }).join(' ');
+/** One pinyin token per character, with tone marks. */
+export function pinyinOf(text: string): string[] {
+  const chars = Array.from(text);
+  if (chars.length === 0) return [];
+
+  const list = pinyin(text, {
+    toneType: "symbol",
+    type: "array",
+    nonZh: "consecutive",
+  });
+
+  if (list.length === chars.length) return list;
+  return chars.map((char) => pinyin(char, { toneType: "symbol", type: "array" })[0] ?? "");
 }
 
-/**
- * Get pinyin for a single character
- */
-export function charToPinyin(char: string): string {
-  return pinyin(char, { toneType: 'none', type: 'array' }).join(' ');
+export function showRuby(character: string, reading: string | undefined) {
+  if (!reading || reading === character) return false;
+  return /[a-zāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜü]/i.test(reading);
 }

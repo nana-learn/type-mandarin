@@ -2,6 +2,7 @@ export type TestResult = {
   at: number;
   duration: number;
   level?: string;
+  title?: string;
   cpm: number;
   accuracy: number;
   correct: number;
@@ -32,6 +33,13 @@ export function scoreTyped(target: string, typed: string) {
 export function charactersPerMinute(correct: number, elapsedMs: number) {
   if (elapsedMs <= 0) return 0;
   return Math.round((correct * 60000) / elapsedMs);
+}
+
+export function formatDuration(ms: number) {
+  const total = Math.max(0, Math.round(ms / 1000));
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
 export const HISTORY_KEY = "type-mandarin-history";

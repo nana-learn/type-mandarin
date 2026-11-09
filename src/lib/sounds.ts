@@ -1,7 +1,13 @@
 // Simple sound effects using Web Audio API
 // No external assets required
 
-const audioCtx = typeof window !== "undefined" ? new (window.AudioContext || (window as any).webkitAudioContext)() : null;
+function createAudioContext() {
+  if (typeof window === "undefined") return null;
+  const Ctx = window.AudioContext ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  return Ctx ? new Ctx() : null;
+}
+
+const audioCtx = createAudioContext();
 
 export function playSound(type: "correct" | "wrong") {
   if (!audioCtx) return;
