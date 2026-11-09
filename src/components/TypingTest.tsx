@@ -10,19 +10,24 @@ import {
   loadHistory,
   loadReview,
   loadStats,
+  loadStreak,
   missedSentenceList,
   missedSentences,
   mistakesOf,
   noteRun,
   rememberSentences,
+  nextStreak,
   saveHistory,
   saveReview,
   saveStats,
+  saveStreak,
+  streakIsLive,
   scoreTyped,
   seedStats,
   stopAtFirstMistake,
   type LevelStats,
   type ReviewItem,
+  type Streak,
   type TestResult,
 } from "@/lib/scoring";
 import { initAudio, playFinishSound, playSound } from "@/lib/sounds";
@@ -104,6 +109,35 @@ function useHydrated() {
   );
 }
 
+function keyboardInset() {
+  const viewport = window.visualViewport;
+  if (!viewport) return 0;
+  return Math.max(0, Math.round(window.innerHeight - viewport.height - viewport.offsetTop));
+}
+
+function subscribeViewport(onChange: () => void) {
+  const viewport = window.visualViewport;
+  if (!viewport) return () => {};
+  viewport.addEventListener("resize", onChange);
+  viewport.addEventListener("scroll", onChange);
+  window.addEventListener("resize", onChange);
+  return () => {
+    viewport.removeEventListener("resize", onChange);
+    viewport.removeEventListener("scroll", onChange);
+    window.removeEventListener("resize", onChange);
+  };
+}
+
+function useKeyboardInset() {
+  return useSyncExternalStore(subscribeViewport, keyboardInset, () => 0);
+}
+
+function focusInput(input: HTMLTextAreaElement | null, force = false) {
+  if (!input) return;
+  if (!force && window.matchMedia("(max-width: 767px)").matches) return;
+  input.focus();
+}
+
 export default function TypingTest() {
   const [level, setLevel] = useState<Level>("hsk1");
   const [passage, setPassage] = useState<Passage | null>(null);
@@ -120,6 +154,8 @@ export default function TypingTest() {
   const [review, setReview] = useState<ReviewItem[]>([]);
   const [elapsed, setElapsed] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [streak, setStreak] = useState<Streak | null>(null);
+  const keyboardInset = useKeyboardInset();
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const nextRef = useRef<HTMLButtonElement>(null);
@@ -134,6 +170,7 @@ export default function TypingTest() {
   const soundRef = useRef<SoundMode>("all");
   const strictRef = useRef(false);
   const statsRef = useRef<Record<string, LevelStats>>({});
+  const streakRef = useRef<Streak | null>(null);
   const recentRef = useRef<string[]>([]);
   const passageBoxRef = useRef<HTMLDivElement>(null);
 
@@ -150,6 +187,7 @@ export default function TypingTest() {
     setHistory(history);
     setReview(loadReview());
     setLevelStats(seedStats(loadStats(), history));
+    setStreak(loadStreak());
   }
 
   const target = passage?.text ?? "";
@@ -164,6 +202,7 @@ export default function TypingTest() {
   const catalog = passagesFor(level);
   const selectedId = passage && catalog.some((item) => item.id === urlIdOf(passage.id)) ? urlIdOf(passage.id) : "";
   const reviewHere = review.filter((item) => item.level === level).slice(0, 5);
+  const liveStreak = streakIsLive(streak) ? streak : null;
   const upcoming = targetChars.slice(charsOf(typed).length, charsOf(typed).length + 8).join("");
   const stuck = strict && charsOf(typed).length > 0 && charsOf(typed).at(-1) !== targetChars[charsOf(typed).length - 1];
   const readings = useSyncExternalStore(
@@ -190,7 +229,7 @@ export default function TypingTest() {
     startedAt.current = null;
     prevLen.current = 0;
     setRunId((id) => id + 1);
-    window.setTimeout(() => inputRef.current?.focus(), 0);
+    window.setTimeout(() => focusInput(inputRef.current, true), 0);
   }, []);
 
   const finish = useCallback((value: string) => {
@@ -222,11 +261,15 @@ export default function TypingTest() {
     historyRef.current = nextHistory;
     saveHistory(nextHistory);
     setHistory(nextHistory);
-    if (!current.id.endsWith("__drill")) {
+    if (!current.id.endsWith("__drill") && !current.id.endsWith("-review")) {
       const nextStats = noteRun(statsRef.current, levelRef.current, result.cpm, result.accuracy);
       statsRef.current = nextStats;
       saveStats(nextStats);
       setLevelStats(nextStats);
+      const nextStreakValue = nextStreak(streakRef.current, result.at);
+      streakRef.current = nextStreakValue;
+      saveStreak(nextStreakValue);
+      setStreak(nextStreakValue);
     }
     setFinished(result);
     setElapsed(duration);
@@ -271,6 +314,7 @@ export default function TypingTest() {
     soundRef.current = soundMode;
     strictRef.current = strict;
     statsRef.current = levelStats;
+    streakRef.current = streak;
     if (passage) {
       recentRef.current = [passage.id, ...recentRef.current.filter((id) => id !== passage.id)].slice(0, 12);
     }
@@ -281,7 +325,7 @@ export default function TypingTest() {
     writePracticeToUrl(level, findPassage(level, urlIdOf(passage.id))?.id);
     if (finishedRef.current) return;
     window.setTimeout(() => {
-      if (!finishedRef.current) inputRef.current?.focus();
+      if (!finishedRef.current) focusInput(inputRef.current);
     }, 0);
   }, [booted, level, passage, runId]);
 
@@ -451,7 +495,7 @@ export default function TypingTest() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <main className="max-w-4xl mx-auto px-4 py-8 pb-44 md:pb-8">
         <div className="flex flex-col gap-3 mb-6">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-[#a39a8c] w-10">等级</span>
@@ -497,6 +541,7 @@ export default function TypingTest() {
               ? `${LEVEL_LABELS[level]} · ${passage.title}${position && position.index >= 0 ? ` · ${position.index + 1}/${position.total}` : ""}`
               : `每次打开 ${LEVEL_LABELS[level]} 都会随机一篇该等级的段落。`}
             {stats && stats.runs > 0 ? ` · 最好 ${stats.bestCpm} 字/分 · ${stats.runs} 次` : ""}
+            {liveStreak ? ` · 连续 ${liveStreak.count} 天` : ""}
             {strict ? " · 打错后必须退格" : ""}
           </p>
         </div>
@@ -520,7 +565,7 @@ export default function TypingTest() {
 
         <div
           ref={passageBoxRef}
-          className="passage w-full text-left rounded-2xl border border-[#2a261f] bg-[#161411] p-5 md:p-6 mb-4 min-h-[220px] max-h-[28rem] overflow-y-auto cursor-text"
+          className="passage w-full text-left rounded-2xl border border-[#2a261f] bg-[#161411] p-5 md:p-6 mb-4 min-h-[160px] md:min-h-[220px] max-h-[40vh] md:max-h-[28rem] overflow-y-auto cursor-text"
           onClick={() => {
             initAudio();
             if (!finished) inputRef.current?.focus();
@@ -598,7 +643,10 @@ export default function TypingTest() {
             </div>
           </section>
         ) : (
-          <div className="mb-4">
+          <div
+            className="fixed inset-x-0 z-30 border-t border-[#2a261f] bg-[#0c0b0a]/95 px-4 pt-3 backdrop-blur-sm pb-[max(0.75rem,env(safe-area-inset-bottom))] md:static md:z-auto md:mb-4 md:border-0 md:bg-transparent md:px-0 md:pt-0 md:pb-0"
+            style={{ bottom: keyboardInset }}
+          >
             {target && (
               <p className="mb-2 text-sm text-[#a39a8c]">
                 {stuck ? "请先退格改正。" : `接下来：${upcoming || "完成"}`}
@@ -634,6 +682,20 @@ export default function TypingTest() {
               onInput={syncTyped}
             />
           </label>
+          </div>
+        )}
+        {finished && (
+          <div
+            className="fixed inset-x-0 z-30 border-t border-[#2a261f] bg-[#0c0b0a]/95 px-4 pt-3 backdrop-blur-sm pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden"
+            style={{ bottom: keyboardInset }}
+          >
+            <button
+              type="button"
+              onClick={() => begin(level)}
+              className="w-full rounded-xl bg-[#d45d32] px-3 py-3 text-white"
+            >
+              下一段 · {finished.cpm} 字/分
+            </button>
           </div>
         )}
 

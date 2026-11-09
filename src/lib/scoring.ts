@@ -189,6 +189,56 @@ export function saveReview(items: ReviewItem[]) {
   window.localStorage.setItem(REVIEW_KEY, JSON.stringify(items.slice(0, 20)));
 }
 
+export type Streak = {
+  count: number;
+  lastDay: string;
+};
+
+export const STREAK_KEY = "type-mandarin-streak";
+
+export function dayKey(at = Date.now()) {
+  const date = new Date(at);
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+export function shiftDay(day: string, delta: number) {
+  const [year, month, date] = day.split("-").map(Number);
+  return dayKey(new Date(year, month - 1, date + delta).getTime());
+}
+
+export function nextStreak(streak: Streak | null, at = Date.now()): Streak {
+  const today = dayKey(at);
+  if (!streak?.lastDay) return { count: 1, lastDay: today };
+  if (streak.lastDay === today) return streak;
+  if (streak.lastDay === shiftDay(today, -1)) return { count: streak.count + 1, lastDay: today };
+  return { count: 1, lastDay: today };
+}
+
+export function streakIsLive(streak: Streak | null, at = Date.now()) {
+  if (!streak?.lastDay) return false;
+  const today = dayKey(at);
+  return streak.lastDay === today || streak.lastDay === shiftDay(today, -1);
+}
+
+export function loadStreak(): Streak | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(STREAK_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Streak;
+    if (!parsed || typeof parsed.count !== "number" || typeof parsed.lastDay !== "string") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function saveStreak(streak: Streak) {
+  window.localStorage.setItem(STREAK_KEY, JSON.stringify(streak));
+}
+
 export function charactersPerMinute(correct: number, elapsedMs: number) {
   if (elapsedMs <= 0) return 0;
   return Math.round((correct * 60000) / elapsedMs);

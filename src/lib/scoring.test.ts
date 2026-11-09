@@ -3,10 +3,12 @@ import { test } from "node:test";
 import {
   missedSentenceList,
   missedSentences,
+  nextStreak,
   noteRun,
   rememberSentences,
   scoreTyped,
   seedStats,
+  shiftDay,
   stopAtFirstMistake,
 } from "./scoring.ts";
 
@@ -25,6 +27,15 @@ test("stopAtFirstMistake keeps the error and drops what follows", () => {
 test("missedSentences keeps only the sentence with a mismatch", () => {
   assert.equal(missedSentences("我爱家。今天很热。", "我爱家。今天很冷。"), "今天很热。");
   assert.equal(missedSentences("只有一句。", "只有一句。"), null);
+});
+
+test("nextStreak continues yesterday and resets after a gap", () => {
+  const today = "2026-03-20";
+  const yesterday = shiftDay(today, -1);
+  const at = new Date(2026, 2, 20, 12).getTime();
+  assert.equal(nextStreak({ count: 4, lastDay: yesterday }, at).count, 5);
+  assert.equal(nextStreak({ count: 4, lastDay: today }, at).count, 4);
+  assert.equal(nextStreak({ count: 4, lastDay: shiftDay(today, -3) }, at).count, 1);
 });
 
 test("rememberSentences counts a repeated miss and keeps the newest time", () => {
