@@ -1,5 +1,11 @@
 type PoolItem = { id: string };
 
+export function preferUnfinished<T extends PoolItem>(pool: T[], doneIds: string[]): T[] {
+  const done = new Set(doneIds);
+  const left = pool.filter((item) => !done.has(item.id));
+  return left.length > 0 ? left : pool;
+}
+
 export function findIn<T extends PoolItem>(pool: T[], id: string | null | undefined): T | undefined {
   if (!id) return undefined;
   return pool.find((item) => item.id === id);

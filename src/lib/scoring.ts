@@ -219,6 +219,35 @@ export function charDrill(chars: string[]) {
 }
 
 export const CHARS_KEY = "type-mandarin-chars";
+export const DONE_KEY = "type-mandarin-done";
+
+export function loadDone(): Record<string, string[]> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(DONE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, string[]>;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveDone(done: Record<string, string[]>) {
+  window.localStorage.setItem(DONE_KEY, JSON.stringify(done));
+}
+
+export function markDone(done: Record<string, string[]>, level: string, id: string) {
+  const ids = new Set(done[level] ?? []);
+  ids.add(id);
+  return { ...done, [level]: [...ids] };
+}
+
+export function clearDone(done: Record<string, string[]>, level: string) {
+  const next = { ...done };
+  delete next[level];
+  return next;
+}
 
 export function loadChars(): CharStat[] {
   if (typeof window === "undefined") return [];

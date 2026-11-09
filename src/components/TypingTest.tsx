@@ -1,19 +1,23 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { preferUnfinished } from "@/lib/pool";
 import { readingsFor, requestReadings, subscribeReadings } from "@/lib/pinyin-loader";
 import { showRuby } from "@/lib/ruby";
 import {
   charsOf,
   charactersPerMinute,
   charDrill,
+  clearDone,
   formatDuration,
   loadChars,
+  loadDone,
   loadHistory,
   loadReview,
   loadStats,
   loadDaily,
   loadStreak,
+  markDone,
   missedSentenceList,
   missedSentences,
   mistakesOf,
@@ -24,6 +28,7 @@ import {
   noteDaily,
   saveDaily,
   saveChars,
+  saveDone,
   saveHistory,
   saveReview,
   saveStats,
@@ -167,6 +172,7 @@ export default function TypingTest() {
   const [history, setHistory] = useState<TestResult[]>([]);
   const [review, setReview] = useState<ReviewItem[]>([]);
   const [chars, setChars] = useState<CharStat[]>([]);
+  const [done, setDone] = useState<Record<string, string[]>>({});
   const [elapsed, setElapsed] = useState(0);
   const [copied, setCopied] = useState(false);
   const [streak, setStreak] = useState<Streak | null>(null);
@@ -186,6 +192,7 @@ export default function TypingTest() {
   const historyRef = useRef<TestResult[]>([]);
   const reviewRef = useRef<ReviewItem[]>([]);
   const charsRef = useRef<CharStat[]>([]);
+  const doneRef = useRef<Record<string, string[]>>({});
   const soundRef = useRef<SoundMode>("all");
   const strictRef = useRef(false);
   const statsRef = useRef<Record<string, LevelStats>>({});
@@ -198,7 +205,8 @@ export default function TypingTest() {
   const pool = useSyncExternalStore(subscribeCatalog, () => levelPassages(level), () => null);
   if (booted && pool && pool.length > 0 && !passage && !finished) {
     const wanted = pendingPick === "random" ? null : pendingPick ?? readPassageIdFromUrl();
-    const next = findIn(pool, wanted) ?? pickRandom(pool, pendingPick === "random" ? pendingAvoid : []);
+    const source = preferUnfinished(pool, done[level] ?? []);
+    const next = findIn(pool, wanted) ?? pickRandom(source, pendingPick === "random" ? pendingAvoid : []);
     setPendingPick(null);
     if (next) setPassage(next);
   }
@@ -214,6 +222,7 @@ export default function TypingTest() {
     setHistory(history);
     setReview(loadReview());
     setChars(loadChars());
+    setDone(loadDone());
     setLevelStats(seedStats(loadStats(), history));
     setStreak(loadStreak());
     setDaily(loadDaily());
@@ -235,6 +244,7 @@ export default function TypingTest() {
   const weakText = charDrill(weakChars.map((item) => item.char));
   const liveStreak = streakIsLive(streak) ? streak : null;
   const todayCount = daily && daily.day === dayKey() ? daily.count : 0;
+  const finishedIds = new Set(done[level] ?? []);
   const upcoming = targetChars.slice(charsOf(typed).length, charsOf(typed).length + 8).join("");
   const stuck = strict && charsOf(typed).length > 0 && charsOf(typed).at(-1) !== targetChars[charsOf(typed).length - 1];
   const readings = useSyncExternalStore(
@@ -263,7 +273,8 @@ export default function TypingTest() {
       requestLevel(nextLevel);
       return;
     }
-    const next = same ?? pickRandom(loaded ?? [], avoid);
+    const source = preferUnfinished(loaded ?? [], doneRef.current[nextLevel] ?? []);
+    const next = same ?? pickRandom(source, avoid);
     if (!next) return;
     recentRef.current = [next.id, ...recentRef.current.filter((id) => id !== next.id)].slice(0, 12);
     passageRef.current = next;
@@ -318,6 +329,12 @@ export default function TypingTest() {
       charsRef.current = nextChars;
       saveChars(nextChars);
       setChars(nextChars);
+    }
+    if (result.passageId && result.wrong === 0) {
+      const nextDone = markDone(doneRef.current, levelRef.current, result.passageId);
+      doneRef.current = nextDone;
+      saveDone(nextDone);
+      setDone(nextDone);
     }
     if (!current.id.endsWith("__drill") && !current.id.endsWith("-review") && !current.id.endsWith("-chars")) {
       const nextStats = noteRun(statsRef.current, levelRef.current, result.cpm, result.accuracy);
@@ -374,6 +391,7 @@ export default function TypingTest() {
     historyRef.current = history;
     reviewRef.current = review;
     charsRef.current = chars;
+    doneRef.current = done;
     soundRef.current = soundMode;
     strictRef.current = strict;
     statsRef.current = levelStats;
@@ -606,10 +624,24 @@ export default function TypingTest() {
               {selectedId === "" && <option value="">当前练习</option>}
               {catalog.map((item, index) => (
                 <option key={item.id} value={item.id}>
-                  {index + 1}. {item.title}
+                  {finishedIds.has(item.id) ? "✓ " : ""}{index + 1}. {item.title}
                 </option>
               ))}
             </select>
+            {finishedIds.size > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  const next = clearDone(done, level);
+                  doneRef.current = next;
+                  saveDone(next);
+                  setDone(next);
+                }}
+                className="text-[#7d766a] hover:text-white"
+              >
+                重置
+              </button>
+            )}
           </label>
           <p className="text-xs text-[#7d766a]">
             {passage
@@ -618,6 +650,7 @@ export default function TypingTest() {
             {stats && stats.runs > 0 ? ` · 最好 ${stats.bestCpm} 字/分 · ${stats.runs} 次` : ""}
             {liveStreak ? ` · 连续 ${liveStreak.count} 天` : ""}
             {` · 今天 ${Math.min(todayCount, DAILY_GOAL)}/${DAILY_GOAL}`}
+            {catalog.length > 0 ? ` · 已完成 ${finishedIds.size}/${catalog.length}` : ""}
             {strict ? " · 打错后必须退格" : ""}
           </p>
         </div>
