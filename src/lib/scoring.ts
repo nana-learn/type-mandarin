@@ -14,6 +14,12 @@ export function charsOf(value: string): string[] {
   return Array.from(value);
 }
 
+export type Mistake = {
+  index: number;
+  expected: string;
+  actual: string;
+};
+
 export function scoreTyped(target: string, typed: string) {
   const targetChars = charsOf(target);
   const typedChars = charsOf(typed);
@@ -28,6 +34,30 @@ export function scoreTyped(target: string, typed: string) {
   const typedCount = typedChars.length;
   const accuracy = typedCount === 0 ? 100 : (correct / typedCount) * 100;
   return { correct, wrong, typed: typedCount, accuracy };
+}
+
+export function mistakesOf(target: string, typed: string): Mistake[] {
+  const targetChars = charsOf(target);
+  const typedChars = charsOf(typed);
+  const mistakes: Mistake[] = [];
+  const length = Math.min(targetChars.length, typedChars.length);
+  for (let i = 0; i < length; i += 1) {
+    if (typedChars[i] !== targetChars[i]) {
+      mistakes.push({ index: i, expected: targetChars[i], actual: typedChars[i] });
+    }
+  }
+  return mistakes;
+}
+
+/** Keep characters through the first mismatch, so later keystrokes cannot skip an error. */
+export function stopAtFirstMistake(expected: string[], typed: string[]) {
+  const kept: string[] = [];
+  const length = Math.min(expected.length, typed.length);
+  for (let i = 0; i < length; i += 1) {
+    kept.push(typed[i]);
+    if (typed[i] !== expected[i]) break;
+  }
+  return kept.join("");
 }
 
 export function charactersPerMinute(correct: number, elapsedMs: number) {

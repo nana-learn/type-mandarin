@@ -25,9 +25,16 @@ export function passagesFor(level: Level): Passage[] {
   return PASSAGES.filter((passage) => passage.level === level);
 }
 
-export function randomPassage(level: Level, avoidId?: string): Passage {
+export function findPassage(level: Level, id: string | null | undefined): Passage | undefined {
+  if (!id) return undefined;
+  const found = passagesFor(level).find((item) => item.id === id);
+  return found ? { ...found, text: found.text.trim() } : undefined;
+}
+
+export function randomPassage(level: Level, avoidIds: string[] = []): Passage {
   const pool = passagesFor(level);
-  const choices = avoidId ? pool.filter((item) => item.id !== avoidId) : pool;
+  const blocked = new Set(avoidIds);
+  const choices = pool.filter((item) => !blocked.has(item.id));
   const source = choices.length > 0 ? choices : pool;
   const picked = source[Math.floor(Math.random() * source.length)] ?? PASSAGES[0];
   return { ...picked, text: picked.text.trim() };
@@ -46,8 +53,18 @@ export function readLevelFromUrl(): Level {
   return isLevel(params.get("level")) ? params.get("level") as Level : "hsk1";
 }
 
-export function writeLevelToUrl(level: Level) {
+export function readPassageIdFromUrl() {
+  return new URLSearchParams(window.location.search).get("id");
+}
+
+export function writePracticeToUrl(level: Level, id?: string) {
   const url = new URL(window.location.href);
   url.searchParams.set("level", level);
+  if (id) url.searchParams.set("id", id);
+  else url.searchParams.delete("id");
   window.history.replaceState(null, "", url);
+}
+
+export function writeLevelToUrl(level: Level) {
+  writePracticeToUrl(level);
 }

@@ -18,7 +18,7 @@ Choose **HSK 1–6**. The URL stores the level, and each visit loads a **random 
 | HSK 6 | 100 | [type](https://nana-learn.github.io/type-mandarin/?level=hsk6) |
 | **Total** | **600** | |
 
-Default is HSK 1. Changing the level in the UI updates the query string, so the page is shareable.
+Default is HSK 1. A level link without an id starts on a random paragraph. After one is chosen, the URL also stores that paragraph id, so a refresh or a shared link opens the same text.
 
 ## How it works
 
@@ -26,7 +26,7 @@ Default is HSK 1. Changing the level in the UI updates the query string, so the 
 2. Pick a level, then type the paragraph in the input box.
 3. Finishing a paragraph shows characters per minute and accuracy. Load another, or repeat the same one.
 
-Wrong characters are marked in red; you can backspace to fix them. Paste is disabled. Esc loads another random paragraph at the same level. The header can show tone-marked pinyin above each character, or turn keystroke sounds off. Both choices are remembered.
+Wrong characters are marked in red, and the character you actually typed is shown underneath. Strict mode stops at the first mistake until you backspace. Paste is disabled. Esc loads another random paragraph at the same level. The header can show tone-marked pinyin above each character, turn on strict mode, or turn keystroke sounds off. Those choices are remembered.
 
 ## Tech stack
 

@@ -7,24 +7,29 @@ import {
   charactersPerMinute,
   formatDuration,
   loadHistory,
+  mistakesOf,
   saveHistory,
   scoreTyped,
+  stopAtFirstMistake,
   type TestResult,
 } from "@/lib/scoring";
 import { initAudio, playFinishSound, playSound } from "@/lib/sounds";
 import {
+  findPassage,
   isLevel,
   LEVELS,
   LEVEL_LABELS,
   randomPassage,
   readLevelFromUrl,
-  writeLevelToUrl,
+  readPassageIdFromUrl,
+  writePracticeToUrl,
   type Level,
   type Passage,
 } from "@/lib/texts";
 
 const SOUND_KEY = "soundEnabled";
 const PINYIN_KEY = "showPinyin";
+const STRICT_KEY = "strictMode";
 const PUNCTUATION = /^[\s，。！？、；：,.!?;:“”‘’（）()【】《》…—～·]$/;
 
 function readFlag(key: string, fallback: boolean) {
@@ -57,6 +62,8 @@ export default function TypingTest() {
   const [runId, setRunId] = useState(0);
   const [showPinyin, setShowPinyin] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [strict, setStrict] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [booted, setBooted] = useState(false);
   const [finished, setFinished] = useState<TestResult | null>(null);
   const [history, setHistory] = useState<TestResult[]>([]);
@@ -73,15 +80,19 @@ export default function TypingTest() {
   const levelRef = useRef<Level>(level);
   const historyRef = useRef<TestResult[]>([]);
   const soundRef = useRef(soundEnabled);
+  const strictRef = useRef(false);
+  const recentRef = useRef<string[]>([]);
+  const passageBoxRef = useRef<HTMLDivElement>(null);
 
   const hydrated = useHydrated();
   if (hydrated && !booted) {
     const fromUrl = readLevelFromUrl();
     setBooted(true);
     setLevel(fromUrl);
-    setPassage(randomPassage(fromUrl));
+    setPassage(findPassage(fromUrl, readPassageIdFromUrl()) ?? randomPassage(fromUrl));
     setShowPinyin(readFlag(PINYIN_KEY, false));
     setSoundEnabled(readFlag(SOUND_KEY, true));
+    setStrict(readFlag(STRICT_KEY, false));
     setHistory(loadHistory());
   }
 
@@ -95,15 +106,21 @@ export default function TypingTest() {
     [showPinyin, target],
   );
   const best = history.reduce((max, item) => (item.level === level ? Math.max(max, item.cpm) : max), 0);
+  const misses = passage ? mistakesOf(passage.text, typed) : [];
 
   const begin = useCallback((nextLevel: Level, same?: Passage | null) => {
-    const next = same ?? randomPassage(nextLevel, passageRef.current?.level === nextLevel ? passageRef.current.id : undefined);
+    const avoid = nextLevel === levelRef.current ? recentRef.current : [];
+    const next = same ?? randomPassage(nextLevel, avoid);
+    recentRef.current = [next.id, ...recentRef.current.filter((id) => id !== next.id)].slice(0, 12);
+    passageRef.current = next;
+    levelRef.current = nextLevel;
     setLevel(nextLevel);
-    writeLevelToUrl(nextLevel);
+    writePracticeToUrl(nextLevel, next.id);
     setPassage(next);
     setTyped("");
     setFinished(null);
     setCopied(false);
+    setLinkCopied(false);
     setElapsed(0);
     finishedRef.current = false;
     startedAt.current = null;
@@ -142,7 +159,8 @@ export default function TypingTest() {
     const current = passageRef.current;
     if (!current || finishedRef.current) return;
     const expected = charsOf(current.text);
-    const limited = charsOf(raw).slice(0, expected.length).join("");
+    const sliced = charsOf(raw).slice(0, expected.length);
+    const limited = strictRef.current ? stopAtFirstMistake(expected, sliced) : sliced.join("");
     if (inputRef.current && inputRef.current.value !== limited) {
       inputRef.current.value = limited;
     }
@@ -172,13 +190,20 @@ export default function TypingTest() {
     levelRef.current = level;
     historyRef.current = history;
     soundRef.current = soundEnabled;
+    strictRef.current = strict;
+    if (passage) {
+      recentRef.current = [passage.id, ...recentRef.current.filter((id) => id !== passage.id)].slice(0, 12);
+    }
   });
 
   useEffect(() => {
-    if (!booted) return;
-    writeLevelToUrl(level);
-    window.setTimeout(() => inputRef.current?.focus(), 0);
-  }, [booted, level, runId]);
+    if (!booted || !passage) return;
+    writePracticeToUrl(level, passage.id);
+    if (finishedRef.current) return;
+    window.setTimeout(() => {
+      if (!finishedRef.current) inputRef.current?.focus();
+    }, 0);
+  }, [booted, level, passage, runId]);
 
   useEffect(() => {
     if (!booted) return;
@@ -191,6 +216,11 @@ export default function TypingTest() {
   }, [booted, showPinyin]);
 
   useEffect(() => {
+    if (!booted) return;
+    localStorage.setItem(STRICT_KEY, String(strict));
+  }, [booted, strict]);
+
+  useEffect(() => {
     if (!startedAt.current || finished) return;
     const id = window.setInterval(() => {
       if (startedAt.current) setElapsed(Date.now() - startedAt.current);
@@ -199,10 +229,16 @@ export default function TypingTest() {
   }, [typed, finished]);
 
   useEffect(() => {
-    document.querySelector<HTMLElement>(".passage .cur")?.scrollIntoView({
-      block: "nearest",
-      inline: "nearest",
-    });
+    const box = passageBoxRef.current;
+    const current = box?.querySelector<HTMLElement>(".cur");
+    if (!box || !current) return;
+    const boxRect = box.getBoundingClientRect();
+    const currentRect = current.getBoundingClientRect();
+    if (currentRect.top < boxRect.top) {
+      box.scrollTop -= boxRect.top - currentRect.top + 12;
+    } else if (currentRect.bottom > boxRect.bottom) {
+      box.scrollTop += currentRect.bottom - boxRect.bottom + 12;
+    }
   }, [typed, showPinyin]);
 
   useEffect(() => {
@@ -241,6 +277,15 @@ export default function TypingTest() {
       setCopied(true);
     } catch {
       setCopied(false);
+    }
+  };
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setLinkCopied(true);
+    } catch {
+      setLinkCopied(false);
     }
   };
 
@@ -289,6 +334,20 @@ export default function TypingTest() {
               <span className="font-semibold tracking-tight">拼</span>
               <span className="hidden sm:inline">{showPinyin ? "拼音" : "汉字"}</span>
             </button>
+            <button
+              type="button"
+              onClick={() => setStrict((value) => !value)}
+              aria-pressed={strict}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8c547] ${
+                strict
+                  ? "bg-white/10 text-white border border-[#a39a8c]"
+                  : "text-[#6d655b] hover:text-[#a39a8c]"
+              }`}
+              title={strict ? "关闭严格模式" : "严格模式：打错后必须退格"}
+            >
+              <span className="font-semibold">严</span>
+              <span className="hidden sm:inline">{strict ? "严格" : "宽松"}</span>
+            </button>
             <a
               href="https://github.com/nana-learn/type-mandarin"
               className="text-xs text-[#a39a8c] hover:text-white transition-colors px-1"
@@ -328,6 +387,7 @@ export default function TypingTest() {
               ? `${LEVEL_LABELS[level]} · ${passage.title}`
               : `每次打开 ${LEVEL_LABELS[level]} 都会随机一篇该等级的段落。`}
             {best > 0 ? ` · 本级最好 ${best} 字/分` : ""}
+            {strict ? " · 打错后必须退格" : ""}
           </p>
         </div>
 
@@ -349,6 +409,7 @@ export default function TypingTest() {
         </div>
 
         <div
+          ref={passageBoxRef}
           className="passage w-full text-left rounded-2xl border border-[#2a261f] bg-[#161411] p-5 md:p-6 mb-4 min-h-[220px] max-h-[28rem] overflow-y-auto cursor-text"
           onClick={() => {
             initAudio();
@@ -371,6 +432,20 @@ export default function TypingTest() {
             <p className="mt-1 text-sm text-[#a39a8c]">
               准确率 {finished.accuracy}% · 正确 {finished.correct} · 错误 {finished.wrong} · 用时 {formatDuration(finished.duration)}
             </p>
+            {misses.length > 0 && (
+              <ul className="mt-3 flex flex-wrap gap-2">
+                {misses.slice(0, 8).map((miss) => (
+                  <li key={miss.index} className="text-sm rounded-lg border border-[#2a261f] px-2 py-1">
+                    <span className="text-[#fb7185]">{miss.actual}</span>
+                    <span className="text-[#7d766a]"> → </span>
+                    <span>{miss.expected}</span>
+                  </li>
+                ))}
+                {misses.length > 8 && (
+                  <li className="text-xs text-[#7d766a] self-center">还有 {misses.length - 8} 处</li>
+                )}
+              </ul>
+            )}
             <div className="mt-4 flex flex-wrap gap-2">
               <button
                 ref={nextRef}
@@ -393,6 +468,13 @@ export default function TypingTest() {
                 className="px-3 py-1.5 rounded-lg border border-[#2a261f] text-sm hover:text-white hover:border-[#d45d32]"
               >
                 {copied ? "已复制" : "复制成绩"}
+              </button>
+              <button
+                type="button"
+                onClick={copyLink}
+                className="px-3 py-1.5 rounded-lg border border-[#2a261f] text-sm hover:text-white hover:border-[#d45d32]"
+              >
+                {linkCopied ? "链接已复制" : "复制链接"}
               </button>
             </div>
           </section>
@@ -430,7 +512,11 @@ export default function TypingTest() {
         )}
 
         <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-[#a39a8c]">
-          <p>用拼音、五笔或其他输入法打出汉字。Esc 换一段。{finished ? "Enter 下一段。" : ""}</p>
+          <p>
+            用拼音、五笔或其他输入法打出汉字。Esc 换一段。
+            {strict ? "打错后请退格。" : ""}
+            {finished ? "Enter 下一段。" : ""}
+          </p>
           <div className="flex items-center gap-2">
             <span className="text-xs text-[#7d766a]">{formatDuration(elapsed)}</span>
             {!finished && (
@@ -443,6 +529,13 @@ export default function TypingTest() {
                 重练
               </button>
             )}
+            <button
+              type="button"
+              onClick={copyLink}
+              className="shrink-0 px-3 py-1.5 rounded-lg border border-[#2a261f] hover:text-white hover:border-[#d45d32] transition-colors"
+            >
+              {linkCopied ? "已复制" : "链接"}
+            </button>
             <button
               type="button"
               onClick={() => {
@@ -523,10 +616,17 @@ function PassageView({
         }
         const reading = readings[index];
         const punct = PUNCTUATION.test(character);
+        const typedChar = typedChars[index];
+        const wrong = typedChar !== undefined && typedChar !== character;
         return (
-          <span key={`${index}-${character}`} className={punct ? "cell punct" : "cell"}>
+          <span
+            key={`${index}-${character}`}
+            className={punct ? "cell punct" : "cell"}
+            title={wrong ? `打了${typedChar}，应为${character}` : undefined}
+          >
             {showPinyin && <span className="ruby">{showRuby(character, reading) ? reading : ""}</span>}
             <span className={className}>{character}</span>
+            {wrong && <span className="miss">{typedChar}</span>}
           </span>
         );
       })}
