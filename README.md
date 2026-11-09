@@ -26,7 +26,7 @@ Default is HSK 1. A level link without an id starts on a random paragraph. After
 2. Pick a level, then type the paragraph in the input box.
 3. Finishing a paragraph shows characters per minute and accuracy. Load another, or repeat the same one.
 
-Wrong characters are marked in red, and the character you actually typed is shown underneath. After a run you can retry only the sentences you missed. Strict mode stops at the first mistake until you backspace. Paste is disabled. Esc loads another random paragraph; the footer also moves to the previous or next paragraph in that level. The header can show tone-marked pinyin, turn on strict mode, or cycle sounds between all keystrokes, errors only, and mute. Those choices, and each level’s best speed, are remembered.
+Wrong characters are marked in red, and the character you actually typed is shown underneath. After a run you can retry only the sentences you missed. Strict mode stops at the first mistake until you backspace. Paste is disabled. Esc loads another random paragraph; the footer also moves to the previous or next paragraph in that level. The header can show tone-marked pinyin, turn on strict mode, or cycle sounds between all keystrokes, errors only, and mute. A menu jumps to any paragraph in the level. Missed sentences are kept in a review list, and each level’s best speed is remembered.
 
 ## Tech stack
 

@@ -3,6 +3,7 @@ export type TestResult = {
   duration: number;
   level?: string;
   title?: string;
+  passageId?: string;
   cpm: number;
   accuracy: number;
   correct: number;
@@ -62,10 +63,9 @@ export function stopAtFirstMistake(expected: string[], typed: string[]) {
 
 const SENTENCE_END = new Set(["。", "！", "？"]);
 
-/** Sentences that contain a mismatch. Null when there is nothing shorter to retry. */
-export function missedSentences(target: string, typed: string): string | null {
+export function missedSentenceList(target: string, typed: string): string[] {
   const mistakes = mistakesOf(target, typed);
-  if (mistakes.length === 0) return null;
+  if (mistakes.length === 0) return [];
   const indexes = new Set(mistakes.map((item) => item.index));
   const chars = charsOf(target);
   const selected: string[] = [];
@@ -82,9 +82,42 @@ export function missedSentences(target: string, typed: string): string | null {
     start = end;
   }
 
-  const text = selected.filter(Boolean).join("");
+  return selected.filter(Boolean);
+}
+
+/** Sentences that contain a mismatch. Null when there is nothing shorter to retry. */
+export function missedSentences(target: string, typed: string): string | null {
+  const text = missedSentenceList(target, typed).join("");
   if (!text || text === target.trim()) return null;
   return text;
+}
+
+export type ReviewItem = {
+  level: string;
+  text: string;
+  count: number;
+  at: number;
+};
+
+export function rememberSentences(
+  items: ReviewItem[],
+  level: string,
+  sentences: string[],
+  at: number,
+): ReviewItem[] {
+  const next = items.map((item) => ({ ...item }));
+  for (const sentence of sentences) {
+    const text = sentence.trim();
+    if (!text) continue;
+    const found = next.find((item) => item.level === level && item.text === text);
+    if (found) {
+      found.count += 1;
+      found.at = at;
+    } else {
+      next.push({ level, text, count: 1, at });
+    }
+  }
+  return next.sort((a, b) => b.count - a.count || b.at - a.at).slice(0, 20);
 }
 
 export type LevelStats = {
@@ -136,6 +169,24 @@ export function loadStats(): Record<string, LevelStats> {
 
 export function saveStats(stats: Record<string, LevelStats>) {
   window.localStorage.setItem(STATS_KEY, JSON.stringify(stats));
+}
+
+export const REVIEW_KEY = "type-mandarin-review";
+
+export function loadReview(): ReviewItem[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(REVIEW_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as ReviewItem[];
+    return Array.isArray(parsed) ? parsed.filter((item) => item && typeof item.text === "string").slice(0, 20) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveReview(items: ReviewItem[]) {
+  window.localStorage.setItem(REVIEW_KEY, JSON.stringify(items.slice(0, 20)));
 }
 
 export function charactersPerMinute(correct: number, elapsedMs: number) {

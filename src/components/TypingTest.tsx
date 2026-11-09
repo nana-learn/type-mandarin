@@ -8,16 +8,21 @@ import {
   charactersPerMinute,
   formatDuration,
   loadHistory,
+  loadReview,
   loadStats,
+  missedSentenceList,
   missedSentences,
   mistakesOf,
   noteRun,
+  rememberSentences,
   saveHistory,
+  saveReview,
   saveStats,
   scoreTyped,
   seedStats,
   stopAtFirstMistake,
   type LevelStats,
+  type ReviewItem,
   type TestResult,
 } from "@/lib/scoring";
 import { initAudio, playFinishSound, playSound } from "@/lib/sounds";
@@ -28,6 +33,7 @@ import {
   LEVEL_LABELS,
   neighborPassage,
   passagePosition,
+  passagesFor,
   randomPassage,
   readLevelFromUrl,
   readPassageIdFromUrl,
@@ -111,6 +117,7 @@ export default function TypingTest() {
   const [booted, setBooted] = useState(false);
   const [finished, setFinished] = useState<TestResult | null>(null);
   const [history, setHistory] = useState<TestResult[]>([]);
+  const [review, setReview] = useState<ReviewItem[]>([]);
   const [elapsed, setElapsed] = useState(0);
   const [copied, setCopied] = useState(false);
 
@@ -123,6 +130,7 @@ export default function TypingTest() {
   const passageRef = useRef<Passage | null>(null);
   const levelRef = useRef<Level>(level);
   const historyRef = useRef<TestResult[]>([]);
+  const reviewRef = useRef<ReviewItem[]>([]);
   const soundRef = useRef<SoundMode>("all");
   const strictRef = useRef(false);
   const statsRef = useRef<Record<string, LevelStats>>({});
@@ -140,6 +148,7 @@ export default function TypingTest() {
     setStrict(readFlag(STRICT_KEY, false));
     const history = loadHistory();
     setHistory(history);
+    setReview(loadReview());
     setLevelStats(seedStats(loadStats(), history));
   }
 
@@ -152,6 +161,9 @@ export default function TypingTest() {
   const position = passage ? passagePosition(level, passage.id) : null;
   const misses = passage ? mistakesOf(passage.text, typed) : [];
   const drill = finished && passage ? drillPassage(passage, typed) : null;
+  const catalog = passagesFor(level);
+  const selectedId = passage && catalog.some((item) => item.id === urlIdOf(passage.id)) ? urlIdOf(passage.id) : "";
+  const reviewHere = review.filter((item) => item.level === level).slice(0, 5);
   const upcoming = targetChars.slice(charsOf(typed).length, charsOf(typed).length + 8).join("");
   const stuck = strict && charsOf(typed).length > 0 && charsOf(typed).at(-1) !== targetChars[charsOf(typed).length - 1];
   const readings = useSyncExternalStore(
@@ -167,7 +179,7 @@ export default function TypingTest() {
     passageRef.current = next;
     levelRef.current = nextLevel;
     setLevel(nextLevel);
-    writePracticeToUrl(nextLevel, urlIdOf(next.id));
+    writePracticeToUrl(nextLevel, findPassage(nextLevel, urlIdOf(next.id))?.id);
     setPassage(next);
     setTyped("");
     setFinished(null);
@@ -192,12 +204,20 @@ export default function TypingTest() {
       duration,
       level: levelRef.current,
       title: current.title,
+      passageId: findPassage(levelRef.current, urlIdOf(current.id))?.id,
       cpm: charactersPerMinute(score.correct, duration),
       accuracy: Math.round(score.accuracy),
       correct: score.correct,
       wrong: score.wrong,
       typed: score.typed,
     };
+    const missed = missedSentenceList(current.text, value);
+    if (missed.length > 0) {
+      const nextReview = rememberSentences(reviewRef.current, levelRef.current, missed, result.at);
+      reviewRef.current = nextReview;
+      saveReview(nextReview);
+      setReview(nextReview);
+    }
     const nextHistory = [result, ...historyRef.current].slice(0, 10);
     historyRef.current = nextHistory;
     saveHistory(nextHistory);
@@ -247,6 +267,7 @@ export default function TypingTest() {
     passageRef.current = passage;
     levelRef.current = level;
     historyRef.current = history;
+    reviewRef.current = review;
     soundRef.current = soundMode;
     strictRef.current = strict;
     statsRef.current = levelStats;
@@ -257,7 +278,7 @@ export default function TypingTest() {
 
   useEffect(() => {
     if (!booted || !passage) return;
-    writePracticeToUrl(level, urlIdOf(passage.id));
+    writePracticeToUrl(level, findPassage(level, urlIdOf(passage.id))?.id);
     if (finishedRef.current) return;
     window.setTimeout(() => {
       if (!finishedRef.current) inputRef.current?.focus();
@@ -452,6 +473,25 @@ export default function TypingTest() {
               </button>
             ))}
           </div>
+          <label className="flex flex-wrap items-center gap-2 text-xs text-[#a39a8c]">
+            <span className="w-10">篇目</span>
+            <select
+              value={selectedId}
+              onChange={(event) => {
+                const next = findPassage(level, event.target.value);
+                if (next) begin(level, next);
+              }}
+              className="min-w-0 flex-1 rounded-lg border border-[#2a261f] bg-[#12100d] px-2 py-1.5 text-sm text-[#f4efe6]"
+              style={{ colorScheme: "dark" }}
+            >
+              {selectedId === "" && <option value="">当前练习</option>}
+              {catalog.map((item, index) => (
+                <option key={item.id} value={item.id}>
+                  {index + 1}. {item.title}
+                </option>
+              ))}
+            </select>
+          </label>
           <p className="text-xs text-[#7d766a]">
             {passage
               ? `${LEVEL_LABELS[level]} · ${passage.title}${position && position.index >= 0 ? ` · ${position.index + 1}/${position.total}` : ""}`
@@ -667,13 +707,64 @@ export default function TypingTest() {
               </button>
             </div>
             <ul className="flex flex-wrap gap-2">
-              {history.map((item, index) => (
-                <li
-                  key={`${item.at}-${index}`}
-                  className="text-xs text-[#a39a8c] border border-[#2a261f] rounded-full px-2.5 py-1"
-                >
-                  {levelLabel(item.level)}
-                  {item.title ? ` · ${item.title}` : ""} · {item.cpm} 字/分 · {item.accuracy}%
+              {history.map((item, index) => {
+                const saved = isLevel(item.level) && item.passageId ? findPassage(item.level, item.passageId) : undefined;
+                const label = `${levelLabel(item.level)}${item.title ? ` · ${item.title}` : ""} · ${item.cpm} 字/分 · ${item.accuracy}%`;
+                return (
+                  <li key={`${item.at}-${index}`}>
+                    {saved ? (
+                      <button
+                        type="button"
+                        onClick={() => begin(saved.level, saved)}
+                        className="text-xs text-[#a39a8c] border border-[#2a261f] rounded-full px-2.5 py-1 hover:text-white hover:border-[#d45d32]"
+                      >
+                        {label}
+                      </button>
+                    ) : (
+                      <span className="text-xs text-[#a39a8c] border border-[#2a261f] rounded-full px-2.5 py-1">
+                        {label}
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
+        {reviewHere.length > 0 && (
+          <div className="mt-6">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs text-[#7d766a]">错句本</p>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = review.filter((item) => item.level !== level);
+                  reviewRef.current = next;
+                  saveReview(next);
+                  setReview(next);
+                }}
+                className="text-xs text-[#7d766a] hover:text-white"
+              >
+                清除本级
+              </button>
+            </div>
+            <ul className="flex flex-col gap-2">
+              {reviewHere.map((item) => (
+                <li key={`${item.at}-${item.text}`}>
+                  <button
+                    type="button"
+                    onClick={() => begin(level, {
+                      id: `${level}-review`,
+                      title: "错句本",
+                      level,
+                      text: item.text,
+                    })}
+                    className="w-full text-left text-sm rounded-xl border border-[#2a261f] px-3 py-2 hover:border-[#d45d32]"
+                  >
+                    <span className="text-[#fb7185] mr-2">{item.count}次</span>
+                    {item.text}
+                  </button>
                 </li>
               ))}
             </ul>

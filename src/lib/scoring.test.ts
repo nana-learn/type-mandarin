@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  missedSentenceList,
   missedSentences,
   noteRun,
+  rememberSentences,
   scoreTyped,
   seedStats,
   stopAtFirstMistake,
@@ -23,6 +25,14 @@ test("stopAtFirstMistake keeps the error and drops what follows", () => {
 test("missedSentences keeps only the sentence with a mismatch", () => {
   assert.equal(missedSentences("我爱家。今天很热。", "我爱家。今天很冷。"), "今天很热。");
   assert.equal(missedSentences("只有一句。", "只有一句。"), null);
+});
+
+test("rememberSentences counts a repeated miss and keeps the newest time", () => {
+  const once = rememberSentences([], "hsk1", ["今天很热。"], 1);
+  const twice = rememberSentences(once, "hsk1", ["今天很热。", "我爱家。"], 2);
+  assert.equal(twice.length, 2);
+  assert.equal(twice.find((item) => item.text === "今天很热。")?.count, 2);
+  assert.equal(missedSentenceList("我爱家。今天很热。", "我爱家。今天很冷。").join("|"), "今天很热。");
 });
 
 test("noteRun keeps the best score and seedStats ignores an existing record", () => {
