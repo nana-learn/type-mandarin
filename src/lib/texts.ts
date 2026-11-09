@@ -1,70 +1,74 @@
-import { HSK1 } from "./passages/hsk1";
-import { HSK2 } from "./passages/hsk2";
-import { HSK3 } from "./passages/hsk3";
-import { HSK4 } from "./passages/hsk4";
-import { HSK5 } from "./passages/hsk5";
-import { HSK6 } from "./passages/hsk6";
+import { findIn, neighborIn, pickRandom, positionIn } from "./pool";
 import { LEVELS, type Level, type Passage } from "./types";
 
 export { LEVELS, LEVEL_LABELS, type Level, type Passage } from "./types";
 
-export const PASSAGES: Passage[] = [
-  ...HSK1,
-  ...HSK2,
-  ...HSK3,
-  ...HSK4,
-  ...HSK5,
-  ...HSK6,
-];
+const loaders: Record<Level, () => Promise<Passage[]>> = {
+  hsk1: () => import("./passages/hsk1").then((mod) => mod.HSK1),
+  hsk2: () => import("./passages/hsk2").then((mod) => mod.HSK2),
+  hsk3: () => import("./passages/hsk3").then((mod) => mod.HSK3),
+  hsk4: () => import("./passages/hsk4").then((mod) => mod.HSK4),
+  hsk5: () => import("./passages/hsk5").then((mod) => mod.HSK5),
+  hsk6: () => import("./passages/hsk6").then((mod) => mod.HSK6),
+};
+
+const cache = new Map<Level, Passage[]>();
+const pending = new Set<Level>();
+const listeners = new Set<() => void>();
+
+function publish() {
+  listeners.forEach((listener) => listener());
+}
+
+export function subscribeCatalog(listener: () => void) {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+export function levelPassages(level: Level): Passage[] | null {
+  return cache.get(level) ?? null;
+}
+
+export function requestLevel(level: Level) {
+  if (cache.has(level) || pending.has(level)) return;
+  pending.add(level);
+  loaders[level]()
+    .then((list) => {
+      cache.set(level, list.map((item) => ({ ...item, text: item.text.trim() })));
+    })
+    .catch(() => {
+      cache.set(level, []);
+    })
+    .finally(() => {
+      pending.delete(level);
+      publish();
+    });
+}
 
 export function isLevel(value: string | null | undefined): value is Level {
   return value !== null && value !== undefined && (LEVELS as readonly string[]).includes(value);
 }
 
+export { findIn, neighborIn, pickRandom, positionIn };
+
 export function passagesFor(level: Level): Passage[] {
-  return PASSAGES.filter((passage) => passage.level === level);
+  return levelPassages(level) ?? [];
 }
 
 export function findPassage(level: Level, id: string | null | undefined): Passage | undefined {
-  if (!id) return undefined;
-  const found = passagesFor(level).find((item) => item.id === id);
-  return found ? { ...found, text: found.text.trim() } : undefined;
+  return findIn(passagesFor(level), id);
 }
 
-export function randomPassage(level: Level, avoidIds: string[] = []): Passage {
-  const pool = passagesFor(level);
-  const blocked = new Set(avoidIds);
-  const choices = pool.filter((item) => !blocked.has(item.id));
-  const source = choices.length > 0 ? choices : pool;
-  const picked = source[Math.floor(Math.random() * source.length)] ?? PASSAGES[0];
-  return { ...picked, text: picked.text.trim() };
+export function randomPassage(level: Level, avoidIds: string[] = []): Passage | undefined {
+  return pickRandom(passagesFor(level), avoidIds);
 }
 
 export function passagePosition(level: Level, id?: string) {
-  const pool = passagesFor(level);
-  const base = (id ?? "").replace(/__drill$/, "");
-  return { index: pool.findIndex((item) => item.id === base), total: pool.length };
+  return positionIn(passagesFor(level), id);
 }
 
-export function neighborPassage(level: Level, id: string | undefined, delta: number): Passage {
-  const pool = passagesFor(level);
-  const fallback = pool[0] ?? PASSAGES[0];
-  if (pool.length === 0) return { ...fallback, text: fallback.text.trim() };
-  const base = (id ?? "").replace(/__drill$/, "");
-  const index = pool.findIndex((item) => item.id === base);
-  const nextIndex = index === -1
-    ? (delta >= 0 ? 0 : pool.length - 1)
-    : (index + delta + pool.length) % pool.length;
-  const picked = pool[nextIndex];
-  return { ...picked, text: picked.text.trim() };
-}
-
-export function randomPrompt(level: Level): string {
-  return randomPassage(level).text.trim();
-}
-
-export function nextPassage(level: Level): string {
-  return randomPrompt(level);
+export function neighborPassage(level: Level, id: string | undefined, delta: number): Passage | undefined {
+  return neighborIn(passagesFor(level), id, delta);
 }
 
 export function readLevelFromUrl(): Level {
@@ -82,8 +86,4 @@ export function writePracticeToUrl(level: Level, id?: string) {
   if (id) url.searchParams.set("id", id);
   else url.searchParams.delete("id");
   window.history.replaceState(null, "", url);
-}
-
-export function writeLevelToUrl(level: Level) {
-  writePracticeToUrl(level);
 }

@@ -32,16 +32,19 @@ import {
 } from "@/lib/scoring";
 import { initAudio, playFinishSound, playSound } from "@/lib/sounds";
 import {
+  findIn,
   findPassage,
   isLevel,
   LEVELS,
   LEVEL_LABELS,
+  levelPassages,
   neighborPassage,
   passagePosition,
-  passagesFor,
-  randomPassage,
+  pickRandom,
   readLevelFromUrl,
   readPassageIdFromUrl,
+  requestLevel,
+  subscribeCatalog,
   writePracticeToUrl,
   type Level,
   type Passage,
@@ -155,6 +158,8 @@ export default function TypingTest() {
   const [elapsed, setElapsed] = useState(0);
   const [copied, setCopied] = useState(false);
   const [streak, setStreak] = useState<Streak | null>(null);
+  const [pendingPick, setPendingPick] = useState<string | "random" | null>(null);
+  const [pendingAvoid, setPendingAvoid] = useState<string[]>([]);
   const keyboardInset = useKeyboardInset();
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -175,11 +180,18 @@ export default function TypingTest() {
   const passageBoxRef = useRef<HTMLDivElement>(null);
 
   const hydrated = useHydrated();
+  const pool = useSyncExternalStore(subscribeCatalog, () => levelPassages(level), () => null);
+  if (booted && pool && pool.length > 0 && !passage && !finished) {
+    const wanted = pendingPick === "random" ? null : pendingPick ?? readPassageIdFromUrl();
+    const next = findIn(pool, wanted) ?? pickRandom(pool, pendingPick === "random" ? pendingAvoid : []);
+    setPendingPick(null);
+    if (next) setPassage(next);
+  }
+
   if (hydrated && !booted) {
     const fromUrl = readLevelFromUrl();
     setBooted(true);
     setLevel(fromUrl);
-    setPassage(findPassage(fromUrl, readPassageIdFromUrl()) ?? randomPassage(fromUrl));
     setShowPinyin(readFlag(PINYIN_KEY, false));
     setSoundMode(readSoundMode());
     setStrict(readFlag(STRICT_KEY, false));
@@ -199,7 +211,7 @@ export default function TypingTest() {
   const position = passage ? passagePosition(level, passage.id) : null;
   const misses = passage ? mistakesOf(passage.text, typed) : [];
   const drill = finished && passage ? drillPassage(passage, typed) : null;
-  const catalog = passagesFor(level);
+  const catalog = pool ?? [];
   const selectedId = passage && catalog.some((item) => item.id === urlIdOf(passage.id)) ? urlIdOf(passage.id) : "";
   const reviewHere = review.filter((item) => item.level === level).slice(0, 5);
   const liveStreak = streakIsLive(streak) ? streak : null;
@@ -213,7 +225,26 @@ export default function TypingTest() {
 
   const begin = useCallback((nextLevel: Level, same?: Passage | null) => {
     const avoid = nextLevel === levelRef.current ? recentRef.current : [];
-    const next = same ?? randomPassage(nextLevel, avoid);
+    const loaded = levelPassages(nextLevel);
+    if (!same && !loaded) {
+      setPendingPick("random");
+      setPendingAvoid(nextLevel === levelRef.current ? recentRef.current : []);
+      passageRef.current = null;
+      levelRef.current = nextLevel;
+      setLevel(nextLevel);
+      setPassage(null);
+      setTyped("");
+      setFinished(null);
+      setElapsed(0);
+      finishedRef.current = false;
+      startedAt.current = null;
+      prevLen.current = 0;
+      writePracticeToUrl(nextLevel);
+      requestLevel(nextLevel);
+      return;
+    }
+    const next = same ?? pickRandom(loaded ?? [], avoid);
+    if (!next) return;
     recentRef.current = [next.id, ...recentRef.current.filter((id) => id !== next.id)].slice(0, 12);
     passageRef.current = next;
     levelRef.current = nextLevel;
@@ -319,6 +350,17 @@ export default function TypingTest() {
       recentRef.current = [passage.id, ...recentRef.current.filter((id) => id !== passage.id)].slice(0, 12);
     }
   });
+
+  useEffect(() => {
+    if (booted) requestLevel(level);
+  }, [booted, level]);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production") return;
+    if (!("serviceWorker" in navigator)) return;
+    const base = window.location.pathname.startsWith("/type-mandarin") ? "/type-mandarin" : "";
+    navigator.serviceWorker.register(`${base}/sw.js`, { scope: `${base}/` }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!booted || !passage) return;
@@ -648,7 +690,7 @@ export default function TypingTest() {
             style={{ bottom: keyboardInset }}
           >
             {target && (
-              <p className="mb-2 text-sm text-[#a39a8c]">
+              <p className="mb-2 text-sm text-[#a39a8c] md:hidden">
                 {stuck ? "请先退格改正。" : `接下来：${upcoming || "完成"}`}
               </p>
             )}
@@ -772,12 +814,23 @@ export default function TypingTest() {
               {history.map((item, index) => {
                 const saved = isLevel(item.level) && item.passageId ? findPassage(item.level, item.passageId) : undefined;
                 const label = `${levelLabel(item.level)}${item.title ? ` · ${item.title}` : ""} · ${item.cpm} 字/分 · ${item.accuracy}%`;
+                const canOpen = isLevel(item.level) && Boolean(item.passageId);
                 return (
                   <li key={`${item.at}-${index}`}>
-                    {saved ? (
+                    {canOpen ? (
                       <button
                         type="button"
-                        onClick={() => begin(saved.level, saved)}
+                        onClick={() => {
+                          if (!isLevel(item.level) || !item.passageId) return;
+                          if (saved) {
+                            begin(item.level, saved);
+                            return;
+                          }
+                          setPendingPick(item.passageId);
+                          setLevel(item.level);
+                          setPassage(null);
+                          requestLevel(item.level);
+                        }}
                         className="text-xs text-[#a39a8c] border border-[#2a261f] rounded-full px-2.5 py-1 hover:text-white hover:border-[#d45d32]"
                       >
                         {label}
