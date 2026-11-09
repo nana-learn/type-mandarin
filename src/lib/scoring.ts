@@ -218,6 +218,31 @@ export function charDrill(chars: string[]) {
   return `请再打这些字：${unique.join("、")}。${unique.join("")}。`;
 }
 
+export function sentencesContaining(texts: string[], chars: string[], limit = 3) {
+  const wanted = [...new Set(chars.filter((char) => HAN.test(char)))];
+  if (wanted.length === 0) return [];
+  const scored: { text: string; hits: number }[] = [];
+  const seen = new Set<string>();
+  for (const text of texts) {
+    const letters = charsOf(text);
+    let start = 0;
+    for (let i = 0; i < letters.length; i += 1) {
+      if (!SENTENCE_END.has(letters[i]) && i !== letters.length - 1) continue;
+      const sentence = letters.slice(start, i + 1).join("").trim();
+      start = i + 1;
+      if (!sentence || sentence.length > 80 || seen.has(sentence)) continue;
+      const hits = wanted.filter((char) => sentence.includes(char)).length;
+      if (hits === 0) continue;
+      seen.add(sentence);
+      scored.push({ text: sentence, hits });
+    }
+  }
+  return scored
+    .sort((a, b) => b.hits - a.hits || a.text.length - b.text.length)
+    .slice(0, limit)
+    .map((item) => item.text);
+}
+
 export const CHARS_KEY = "type-mandarin-chars";
 export const DONE_KEY = "type-mandarin-done";
 

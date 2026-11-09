@@ -37,6 +37,7 @@ import {
   streakIsLive,
   scoreTyped,
   seedStats,
+  sentencesContaining,
   stopAtFirstMistake,
   dayKey,
   DAILY_GOAL,
@@ -177,6 +178,7 @@ export default function TypingTest() {
   const [elapsed, setElapsed] = useState(0);
   const [copied, setCopied] = useState(false);
   const [backupNote, setBackupNote] = useState("");
+  const [showRecords, setShowRecords] = useState(false);
   const [streak, setStreak] = useState<Streak | null>(null);
   const [daily, setDaily] = useState<Daily | null>(null);
   const [pendingPick, setPendingPick] = useState<string | "random" | null>(null);
@@ -243,7 +245,8 @@ export default function TypingTest() {
   const selectedId = passage && catalog.some((item) => item.id === urlIdOf(passage.id)) ? urlIdOf(passage.id) : "";
   const reviewHere = review.filter((item) => item.level === level).slice(0, 5);
   const weakChars = chars.slice(0, 8);
-  const weakText = charDrill(weakChars.map((item) => item.char));
+  const contextDrill = sentencesContaining(catalog.map((item) => item.text), weakChars.map((item) => item.char));
+  const weakText = contextDrill.length > 0 ? contextDrill.join("") : charDrill(weakChars.map((item) => item.char));
   const liveStreak = streakIsLive(streak) ? streak : null;
   const todayCount = daily && daily.day === dayKey() ? daily.count : 0;
   const finishedIds = new Set(done[level] ?? []);
@@ -353,6 +356,7 @@ export default function TypingTest() {
       setDaily(nextDaily);
     }
     setFinished(result);
+    setShowRecords(true);
     setElapsed(duration);
     if (soundRef.current !== "off") playFinishSound();
   }, []);
@@ -910,6 +914,19 @@ export default function TypingTest() {
           </div>
         </div>
 
+        <div className="mt-6">
+          <button
+            type="button"
+            onClick={() => setShowRecords((value) => !value)}
+            className="text-sm text-[#a39a8c] hover:text-white"
+            aria-expanded={showRecords}
+          >
+            {showRecords ? "收起记录" : "记录"}
+          </button>
+        </div>
+
+        {showRecords && (
+        <>
         {history.length > 0 && (
           <div className="mt-6">
             <div className="flex items-center justify-between mb-2">
@@ -997,7 +1014,7 @@ export default function TypingTest() {
                 })}
                 className="rounded-full border border-[#d45d32] px-3 py-1 text-sm text-[#d45d32] hover:bg-[#d45d32] hover:text-white"
               >
-                再打一遍
+                {contextDrill.length > 0 ? "在句中再打" : "再打一遍"}
               </button>
             </div>
           </div>
@@ -1061,6 +1078,8 @@ export default function TypingTest() {
           </label>
           {backupNote && <span>{backupNote}</span>}
         </div>
+        </>
+        )}
       </main>
     </div>
   );

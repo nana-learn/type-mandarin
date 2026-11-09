@@ -11,6 +11,7 @@ import {
   rememberSentences,
   scoreTyped,
   seedStats,
+  sentencesContaining,
   shiftDay,
   stopAtFirstMistake,
 } from "./scoring.ts";
@@ -30,6 +31,14 @@ test("stopAtFirstMistake keeps the error and drops what follows", () => {
 test("missedSentences keeps only the sentence with a mismatch", () => {
   assert.equal(missedSentences("我爱家。今天很热。", "我爱家。今天很冷。"), "今天很热。");
   assert.equal(missedSentences("只有一句。", "只有一句。"), null);
+});
+
+test("sentencesContaining prefers a short sentence that includes more misses", () => {
+  const found = sentencesContaining([
+    "我爱吃苹果。今天天气很好，我们去公园走路，然后回家吃饭喝茶。",
+    "我不吃鱼。",
+  ], ["吃", "鱼"]);
+  assert.equal(found[0], "我不吃鱼。");
 });
 
 test("rememberChars skips punctuation and charDrill repeats the misses", () => {
