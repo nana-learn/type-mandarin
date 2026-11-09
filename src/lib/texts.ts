@@ -40,6 +40,25 @@ export function randomPassage(level: Level, avoidIds: string[] = []): Passage {
   return { ...picked, text: picked.text.trim() };
 }
 
+export function passagePosition(level: Level, id?: string) {
+  const pool = passagesFor(level);
+  const base = (id ?? "").replace(/__drill$/, "");
+  return { index: pool.findIndex((item) => item.id === base), total: pool.length };
+}
+
+export function neighborPassage(level: Level, id: string | undefined, delta: number): Passage {
+  const pool = passagesFor(level);
+  const fallback = pool[0] ?? PASSAGES[0];
+  if (pool.length === 0) return { ...fallback, text: fallback.text.trim() };
+  const base = (id ?? "").replace(/__drill$/, "");
+  const index = pool.findIndex((item) => item.id === base);
+  const nextIndex = index === -1
+    ? (delta >= 0 ? 0 : pool.length - 1)
+    : (index + delta + pool.length) % pool.length;
+  const picked = pool[nextIndex];
+  return { ...picked, text: picked.text.trim() };
+}
+
 export function randomPrompt(level: Level): string {
   return randomPassage(level).text.trim();
 }

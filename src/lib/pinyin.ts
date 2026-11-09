@@ -14,8 +14,3 @@ export function pinyinOf(text: string): string[] {
   if (list.length === chars.length) return list;
   return chars.map((char) => pinyin(char, { toneType: "symbol", type: "array" })[0] ?? "");
 }
-
-export function showRuby(character: string, reading: string | undefined) {
-  if (!reading || reading === character) return false;
-  return /[a-zāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜü]/i.test(reading);
-}

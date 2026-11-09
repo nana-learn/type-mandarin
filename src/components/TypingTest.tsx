@@ -1,16 +1,23 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { pinyinOf, showRuby } from "@/lib/pinyin";
+import { readingsFor, requestReadings, subscribeReadings } from "@/lib/pinyin-loader";
+import { showRuby } from "@/lib/ruby";
 import {
   charsOf,
   charactersPerMinute,
   formatDuration,
   loadHistory,
+  loadStats,
+  missedSentences,
   mistakesOf,
+  noteRun,
   saveHistory,
+  saveStats,
   scoreTyped,
+  seedStats,
   stopAtFirstMistake,
+  type LevelStats,
   type TestResult,
 } from "@/lib/scoring";
 import { initAudio, playFinishSound, playSound } from "@/lib/sounds";
@@ -19,6 +26,8 @@ import {
   isLevel,
   LEVELS,
   LEVEL_LABELS,
+  neighborPassage,
+  passagePosition,
   randomPassage,
   readLevelFromUrl,
   readPassageIdFromUrl,
@@ -28,8 +37,10 @@ import {
 } from "@/lib/texts";
 
 const SOUND_KEY = "soundEnabled";
+const SOUND_MODE_KEY = "soundMode";
 const PINYIN_KEY = "showPinyin";
 const STRICT_KEY = "strictMode";
+type SoundMode = "all" | "errors" | "off";
 const PUNCTUATION = /^[\s，。！？、；：,.!?;:“”‘’（）()【】《》…—～·]$/;
 
 function readFlag(key: string, fallback: boolean) {
@@ -47,6 +58,38 @@ function levelLabel(level?: string) {
   return isLevel(level) ? LEVEL_LABELS[level] : "练习";
 }
 
+function readSoundMode(): SoundMode {
+  try {
+    const mode = localStorage.getItem(SOUND_MODE_KEY);
+    if (mode === "all" || mode === "errors" || mode === "off") return mode;
+    if (localStorage.getItem(SOUND_KEY) === "false") return "off";
+  } catch {
+    return "all";
+  }
+  return "all";
+}
+
+function nextSoundMode(mode: SoundMode): SoundMode {
+  if (mode === "all") return "errors";
+  if (mode === "errors") return "off";
+  return "all";
+}
+
+function urlIdOf(id: string) {
+  return id.replace(/__drill$/, "");
+}
+
+function drillPassage(source: Passage, typed: string): Passage | null {
+  const text = missedSentences(source.text, typed);
+  if (!text) return null;
+  return {
+    id: `${urlIdOf(source.id)}__drill`,
+    title: `${source.title.replace(/ · 错句$/, "")} · 错句`,
+    level: source.level,
+    text,
+  };
+}
+
 function useHydrated() {
   return useSyncExternalStore(
     () => () => {},
@@ -61,8 +104,9 @@ export default function TypingTest() {
   const [typed, setTyped] = useState("");
   const [runId, setRunId] = useState(0);
   const [showPinyin, setShowPinyin] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [soundMode, setSoundMode] = useState<SoundMode>("all");
   const [strict, setStrict] = useState(false);
+  const [levelStats, setLevelStats] = useState<Record<string, LevelStats>>({});
   const [linkCopied, setLinkCopied] = useState(false);
   const [booted, setBooted] = useState(false);
   const [finished, setFinished] = useState<TestResult | null>(null);
@@ -79,8 +123,9 @@ export default function TypingTest() {
   const passageRef = useRef<Passage | null>(null);
   const levelRef = useRef<Level>(level);
   const historyRef = useRef<TestResult[]>([]);
-  const soundRef = useRef(soundEnabled);
+  const soundRef = useRef<SoundMode>("all");
   const strictRef = useRef(false);
+  const statsRef = useRef<Record<string, LevelStats>>({});
   const recentRef = useRef<string[]>([]);
   const passageBoxRef = useRef<HTMLDivElement>(null);
 
@@ -91,9 +136,11 @@ export default function TypingTest() {
     setLevel(fromUrl);
     setPassage(findPassage(fromUrl, readPassageIdFromUrl()) ?? randomPassage(fromUrl));
     setShowPinyin(readFlag(PINYIN_KEY, false));
-    setSoundEnabled(readFlag(SOUND_KEY, true));
+    setSoundMode(readSoundMode());
     setStrict(readFlag(STRICT_KEY, false));
-    setHistory(loadHistory());
+    const history = loadHistory();
+    setHistory(history);
+    setLevelStats(seedStats(loadStats(), history));
   }
 
   const target = passage?.text ?? "";
@@ -101,12 +148,17 @@ export default function TypingTest() {
   const live = useMemo(() => scoreTyped(target, typed), [target, typed]);
   const cpm = elapsed >= 1000 ? charactersPerMinute(live.correct, elapsed) : null;
   const progress = targetChars.length === 0 ? 0 : Math.min(100, (live.typed / targetChars.length) * 100);
-  const readings = useMemo(
-    () => (showPinyin && target ? pinyinOf(target) : []),
-    [showPinyin, target],
-  );
-  const best = history.reduce((max, item) => (item.level === level ? Math.max(max, item.cpm) : max), 0);
+  const stats = levelStats[level];
+  const position = passage ? passagePosition(level, passage.id) : null;
   const misses = passage ? mistakesOf(passage.text, typed) : [];
+  const drill = finished && passage ? drillPassage(passage, typed) : null;
+  const upcoming = targetChars.slice(charsOf(typed).length, charsOf(typed).length + 8).join("");
+  const stuck = strict && charsOf(typed).length > 0 && charsOf(typed).at(-1) !== targetChars[charsOf(typed).length - 1];
+  const readings = useSyncExternalStore(
+    subscribeReadings,
+    () => readingsFor(target, showPinyin),
+    () => [],
+  );
 
   const begin = useCallback((nextLevel: Level, same?: Passage | null) => {
     const avoid = nextLevel === levelRef.current ? recentRef.current : [];
@@ -115,7 +167,7 @@ export default function TypingTest() {
     passageRef.current = next;
     levelRef.current = nextLevel;
     setLevel(nextLevel);
-    writePracticeToUrl(nextLevel, next.id);
+    writePracticeToUrl(nextLevel, urlIdOf(next.id));
     setPassage(next);
     setTyped("");
     setFinished(null);
@@ -150,9 +202,15 @@ export default function TypingTest() {
     historyRef.current = nextHistory;
     saveHistory(nextHistory);
     setHistory(nextHistory);
+    if (!current.id.endsWith("__drill")) {
+      const nextStats = noteRun(statsRef.current, levelRef.current, result.cpm, result.accuracy);
+      statsRef.current = nextStats;
+      saveStats(nextStats);
+      setLevelStats(nextStats);
+    }
     setFinished(result);
     setElapsed(duration);
-    if (soundRef.current) playFinishSound();
+    if (soundRef.current !== "off") playFinishSound();
   }, []);
 
   const commitTyped = useCallback((raw: string) => {
@@ -172,12 +230,12 @@ export default function TypingTest() {
 
     const prev = prevLen.current;
     const completes = expected.length > 0 && nextChars.length >= expected.length;
-    if (soundRef.current && nextChars.length > prev && !completes) {
+    if (soundRef.current !== "off" && nextChars.length > prev && !completes) {
       let wrong = false;
       for (let i = prev; i < nextChars.length; i += 1) {
         if (nextChars[i] !== expected[i]) wrong = true;
       }
-      playSound(wrong ? "wrong" : "correct");
+      if (wrong || soundRef.current === "all") playSound(wrong ? "wrong" : "correct");
     }
     prevLen.current = nextChars.length;
     setTyped(limited);
@@ -189,8 +247,9 @@ export default function TypingTest() {
     passageRef.current = passage;
     levelRef.current = level;
     historyRef.current = history;
-    soundRef.current = soundEnabled;
+    soundRef.current = soundMode;
     strictRef.current = strict;
+    statsRef.current = levelStats;
     if (passage) {
       recentRef.current = [passage.id, ...recentRef.current.filter((id) => id !== passage.id)].slice(0, 12);
     }
@@ -198,7 +257,7 @@ export default function TypingTest() {
 
   useEffect(() => {
     if (!booted || !passage) return;
-    writePracticeToUrl(level, passage.id);
+    writePracticeToUrl(level, urlIdOf(passage.id));
     if (finishedRef.current) return;
     window.setTimeout(() => {
       if (!finishedRef.current) inputRef.current?.focus();
@@ -207,8 +266,17 @@ export default function TypingTest() {
 
   useEffect(() => {
     if (!booted) return;
-    localStorage.setItem(SOUND_KEY, String(soundEnabled));
-  }, [booted, soundEnabled]);
+    localStorage.setItem(SOUND_MODE_KEY, soundMode);
+  }, [booted, soundMode]);
+
+  useEffect(() => {
+    if (!booted) return;
+    saveStats(levelStats);
+  }, [booted, levelStats]);
+
+  useEffect(() => {
+    if (showPinyin && target) requestReadings(target);
+  }, [showPinyin, target]);
 
   useEffect(() => {
     if (!booted) return;
@@ -307,18 +375,20 @@ export default function TypingTest() {
               type="button"
               onClick={() => {
                 initAudio();
-                setSoundEnabled((value) => !value);
+                setSoundMode((mode) => nextSoundMode(mode));
               }}
-              aria-pressed={soundEnabled}
+              aria-pressed={soundMode !== "off"}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#d45d32] ${
-                soundEnabled
-                  ? "bg-[#d45d32]/20 text-[#d45d32] border border-[#d45d32]/30"
-                  : "text-[#6d655b] hover:text-[#a39a8c]"
+                soundMode === "off"
+                  ? "text-[#6d655b] hover:text-[#a39a8c]"
+                  : soundMode === "errors"
+                    ? "bg-[#e8c547]/15 text-[#e8c547] border border-[#e8c547]/30"
+                    : "bg-[#d45d32]/20 text-[#d45d32] border border-[#d45d32]/30"
               }`}
-              title={soundEnabled ? "关闭声音" : "打开声音"}
+              title={soundMode === "all" ? "改为只在打错时出声" : soundMode === "errors" ? "关闭声音" : "打开全部声音"}
             >
-              <SoundIcon muted={!soundEnabled} />
-              <span className="hidden sm:inline">{soundEnabled ? "声音" : "静音"}</span>
+              <SoundIcon muted={soundMode === "off"} />
+              <span className="hidden sm:inline">{soundMode === "all" ? "声音" : soundMode === "errors" ? "错音" : "静音"}</span>
             </button>
             <button
               type="button"
@@ -384,9 +454,9 @@ export default function TypingTest() {
           </div>
           <p className="text-xs text-[#7d766a]">
             {passage
-              ? `${LEVEL_LABELS[level]} · ${passage.title}`
+              ? `${LEVEL_LABELS[level]} · ${passage.title}${position && position.index >= 0 ? ` · ${position.index + 1}/${position.total}` : ""}`
               : `每次打开 ${LEVEL_LABELS[level]} 都会随机一篇该等级的段落。`}
-            {best > 0 ? ` · 本级最好 ${best} 字/分` : ""}
+            {stats && stats.runs > 0 ? ` · 最好 ${stats.bestCpm} 字/分 · ${stats.runs} 次` : ""}
             {strict ? " · 打错后必须退格" : ""}
           </p>
         </div>
@@ -462,6 +532,15 @@ export default function TypingTest() {
               >
                 再练这篇
               </button>
+              {drill && (
+                <button
+                  type="button"
+                  onClick={() => begin(level, drill)}
+                  className="px-3 py-1.5 rounded-lg border border-[#d45d32] text-sm text-[#d45d32] hover:text-white hover:bg-[#d45d32]"
+                >
+                  只练错句
+                </button>
+              )}
               <button
                 type="button"
                 onClick={copyResult}
@@ -479,7 +558,13 @@ export default function TypingTest() {
             </div>
           </section>
         ) : (
-          <label className="block mb-4">
+          <div className="mb-4">
+            {target && (
+              <p className="mb-2 text-sm text-[#a39a8c]">
+                {stuck ? "请先退格改正。" : `接下来：${upcoming || "完成"}`}
+              </p>
+            )}
+          <label className="block">
             <span className="sr-only">在此输入汉字</span>
             <textarea
               key={runId}
@@ -509,6 +594,7 @@ export default function TypingTest() {
               onInput={syncTyped}
             />
           </label>
+          </div>
         )}
 
         <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-[#a39a8c]">
@@ -519,6 +605,22 @@ export default function TypingTest() {
           </p>
           <div className="flex items-center gap-2">
             <span className="text-xs text-[#7d766a]">{formatDuration(elapsed)}</span>
+            <button
+              type="button"
+              onClick={() => passage && begin(level, neighborPassage(level, passage.id, -1))}
+              disabled={!passage}
+              className="shrink-0 px-3 py-1.5 rounded-lg border border-[#2a261f] hover:text-white hover:border-[#d45d32] transition-colors disabled:opacity-40"
+            >
+              上一篇
+            </button>
+            <button
+              type="button"
+              onClick={() => passage && begin(level, neighborPassage(level, passage.id, 1))}
+              disabled={!passage}
+              className="shrink-0 px-3 py-1.5 rounded-lg border border-[#2a261f] hover:text-white hover:border-[#d45d32] transition-colors disabled:opacity-40"
+            >
+              下一篇
+            </button>
             {!finished && (
               <button
                 type="button"

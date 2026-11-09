@@ -60,6 +60,84 @@ export function stopAtFirstMistake(expected: string[], typed: string[]) {
   return kept.join("");
 }
 
+const SENTENCE_END = new Set(["。", "！", "？"]);
+
+/** Sentences that contain a mismatch. Null when there is nothing shorter to retry. */
+export function missedSentences(target: string, typed: string): string | null {
+  const mistakes = mistakesOf(target, typed);
+  if (mistakes.length === 0) return null;
+  const indexes = new Set(mistakes.map((item) => item.index));
+  const chars = charsOf(target);
+  const selected: string[] = [];
+  let start = 0;
+
+  for (let i = 0; i < chars.length; i += 1) {
+    if (!SENTENCE_END.has(chars[i]) && i !== chars.length - 1) continue;
+    const end = i + 1;
+    let hit = false;
+    for (let j = start; j < end; j += 1) {
+      if (indexes.has(j)) hit = true;
+    }
+    if (hit) selected.push(chars.slice(start, end).join("").trim());
+    start = end;
+  }
+
+  const text = selected.filter(Boolean).join("");
+  if (!text || text === target.trim()) return null;
+  return text;
+}
+
+export type LevelStats = {
+  runs: number;
+  bestCpm: number;
+  bestAccuracy: number;
+};
+
+export const STATS_KEY = "type-mandarin-stats";
+
+export function noteRun(
+  stats: Record<string, LevelStats>,
+  level: string,
+  cpm: number,
+  accuracy: number,
+) {
+  const prev = stats[level] ?? { runs: 0, bestCpm: 0, bestAccuracy: 0 };
+  return {
+    ...stats,
+    [level]: {
+      runs: prev.runs + 1,
+      bestCpm: Math.max(prev.bestCpm, cpm),
+      bestAccuracy: Math.max(prev.bestAccuracy, accuracy),
+    },
+  };
+}
+
+export function seedStats(stats: Record<string, LevelStats>, history: TestResult[]) {
+  if (Object.keys(stats).length > 0) return stats;
+  let next = stats;
+  for (const item of [...history].reverse()) {
+    if (!item.level || item.title?.includes("错句")) continue;
+    next = noteRun(next, item.level, item.cpm, item.accuracy);
+  }
+  return next;
+}
+
+export function loadStats(): Record<string, LevelStats> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(STATS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, LevelStats>;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveStats(stats: Record<string, LevelStats>) {
+  window.localStorage.setItem(STATS_KEY, JSON.stringify(stats));
+}
+
 export function charactersPerMinute(correct: number, elapsedMs: number) {
   if (elapsedMs <= 0) return 0;
   return Math.round((correct * 60000) / elapsedMs);
